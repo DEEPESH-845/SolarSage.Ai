@@ -20,7 +20,7 @@
 
 ---
 
-## 🧪 Production Pipeline
+## 🧪 Production Pipeline demo
 
 🔍 Stage 1: AI Image Analysis
 ✅ Image analysis completed: HIGH risk detected
@@ -37,13 +37,13 @@
 ✅ PIPELINE EXECUTION COMPLETED!
 
 📊 KEY RESULTS:
-🔍 Dust Level: 72.3% (HIGH)
-⚡ Power Loss: 4.7 kWh/day (18.3%)
-🧠 Decision: EXECUTE_IMMEDIATE (87.3% confidence)
-🚿 Execution: EXECUTED
-💰 Cost: $24.50
-💎 Recovery: 4.2 kWh
-📈 ROI: 127.3%
+🔍- Dust Level: 72.3% (HIGH)
+⚡- Power Loss: 4.7 kWh/day (18.3%)
+🧠- Decision: EXECUTE_IMMEDIATE (87.3% confidence)
+🚿 -Execution: EXECUTED
+💰- Cost: $24.50
+💎- Recovery: 4.2 kWh
+📈- ROI: 127.3%
 
 ⚡ PERFORMANCE: 2,671 images/hour capacity
 🎉 Production pipeline demo completed successfully!
@@ -79,6 +79,7 @@ SolarSage employs 4 specialized AI agents that collaborate to optimize solar pan
 
 -->**Output:** Comprehensive dust level analysis with confidence scores
 
+---
 
 
 2. **Llama-Enhanced Solar Forecast Specialist**
@@ -89,10 +90,11 @@ SolarSage employs 4 specialized AI agents that collaborate to optimize solar pan
 
 -->**Output:** 48-hour forecasts with economic impact analysis
 
+---
+
 
 
 3. **AI-Powered Decision Optimization Expert**
-
 
 -->**Role:** Multi-criteria decision making using machine learning
 
@@ -101,6 +103,7 @@ SolarSage employs 4 specialized AI agents that collaborate to optimize solar pan
 -->**Output:** Intelligent cleaning recommendations with detailed reasoning
 
 
+---
 
 4. **Automated Execution & Control Manager**
 
