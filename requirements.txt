@@ -1,0 +1,20 @@
+# Solar Panel Cleaning System - All Dependencies
+crewai
+fastapi
+uvicorn
+opencv-python
+pillow
+numpy
+scikit-learn
+sqlalchemy
+pydantic
+python-multipart
+requests
+APScheduler
+pytest
+pyinstaller
+twine
+build
+paho
+flask
+pydantic-settings
