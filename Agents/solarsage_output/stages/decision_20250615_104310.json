@@ -1,0 +1,30 @@
+{
+  "timestamp": "2025-06-15T10:43:10.677175",
+  "decision_id": "decision_20250615_104310_ce9c3050",
+  "environmental_risk": 72.3,
+  "economic_viability_score": 50.0,
+  "decision_confidence": 85.9,
+  "cleaning_priority": "CONTINUE_MONITORING",
+  "estimated_savings_weekly": 5.37,
+  "decision_score": 60.0,
+  "risk_factors": [],
+  "recommendations": [
+    "Maintain regular monitoring schedule",
+    "Reassess conditions weekly",
+    "Consider preventive maintenance planning",
+    "Monitor environmental factors affecting dust accumulation"
+  ],
+  "cost_benefit_analysis": {
+    "cleaning_investment": 24.5,
+    "weekly_savings": 5.37,
+    "monthly_savings": 23.252100000000002,
+    "annual_savings": 279.24,
+    "annual_cleaning_cost": 567.78,
+    "net_annual_benefit": -288.54,
+    "roi_percentage": -50.8,
+    "payback_period_days": 31.8,
+    "break_even_point": 31.8
+  },
+  "llama_reasoning": "Comprehensive multi-factor analysis indicates continue monitoring with 85.9% confidence. Environmental risk assessment: 72.3/100 (dust level 58.5%, confidence 89.4%). Economic viability: 50.0/100 (daily loss $0.77, payback 31.8 days). Combined decision score: 60.0/100. ROI projection: -50.8% annually. Intelligent automation recommends immediate action for optimal system performance.",
+  "processing_time_ms": 0.0
+}
