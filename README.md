@@ -73,42 +73,42 @@ SolarSage employs 4 specialized AI agents that collaborate to optimize solar pan
 
 1. **Senior Solar Panel Image Analyst**
 
-Role: Computer vision and NPU-accelerated image analysis
+**Role:** Computer vision and NPU-accelerated image analysis
 
-Expertise: Multi-spectral dust detection, condition assessment
+**Expertise:** Multi-spectral dust detection, condition assessment
 
-Output: Comprehensive dust level analysis with confidence scores
+**Output:** Comprehensive dust level analysis with confidence scores
 
 
 
 2. **Llama-Enhanced Solar Forecast Specialist**
 
-Role: Solar power forecasting and economic modeling
+**Role:** Solar power forecasting and economic modeling
 
-Expertise: Weather integration, power loss prediction, economic optimization
+**Expertise:** Weather integration, power loss prediction, economic optimization
 
-Output: 48-hour forecasts with economic impact analysis
+**Output:** 48-hour forecasts with economic impact analysis
 
 
 
 3. **AI-Powered Decision Optimization Expert**
 
 
-Role: Multi-criteria decision making using machine learning
+**Role:** Multi-criteria decision making using machine learning
 
-Expertise: Cost-benefit analysis, risk assessment, ROI optimization
+**Expertise:** Cost-benefit analysis, risk assessment, ROI optimization
 
-Output: Intelligent cleaning recommendations with detailed reasoning
+**Output:** Intelligent cleaning recommendations with detailed reasoning
 
 
 
 4. **Automated Execution & Control Manager**
 
-Role: Real-time operation control and quality monitoring
+**Role:** Real-time operation control and quality monitoring
 
-Expertise: Robotics integration, process optimization, performance tracking
+**Expertise:** Robotics integration, process optimization, performance tracking
 
-Output: Execution reports with comprehensive automation insights
+**Output:** Execution reports with comprehensive automation insights
 
 
 ![Agentic Workflow](assets/5.png)
