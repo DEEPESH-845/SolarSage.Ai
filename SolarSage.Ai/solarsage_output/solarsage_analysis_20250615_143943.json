@@ -1,0 +1,55 @@
+{
+  "pipeline_id": "pipeline_20250615_143942_ab34ad04",
+  "analysis_id": "analysis_20250615_143942_74433c51",
+  "timestamp": "2025-06-15T14:39:43.260789",
+  "status": "SUCCESS",
+  "current_stage": "completed",
+  "completed_stages": [
+    "image_analysis",
+    "forecast",
+    "decision",
+    "execution"
+  ],
+  "image_analysis": "<__main__.AIAnalysisResult object at 0x000001550839F410>",
+  "forecast": "<__main__.QuartzForecastResult object at 0x000001550EE33560>",
+  "decision": "<__main__.IntelligentDecisionResult object at 0x00000155068B8CE0>",
+  "execution": "<__main__.AutomatedExecutionResult object at 0x00000155081FD250>",
+  "summary": {
+    "pipeline_id": "pipeline_20250615_143942_ab34ad04",
+    "analysis_id": "analysis_20250615_143942_74433c51",
+    "execution_timestamp": "2025-06-15T14:39:43.260789",
+    "overall_status": "SUCCESS",
+    "pipeline_version": "2025.1_bulletproof",
+    "crewai_enabled": false,
+    "numpy_available": true,
+    "pydantic_available": false,
+    "stages_completed": [
+      "image_analysis",
+      "forecast",
+      "decision",
+      "execution"
+    ],
+    "key_metrics": {
+      "dust_level_percent": 55.5,
+      "risk_category": "HIGH",
+      "confidence_score": 86.4,
+      "daily_power_loss_kwh": 6.0,
+      "power_loss_percentage": 20.9,
+      "decision": "CONTINUE_MONITORING",
+      "decision_confidence": 84.9,
+      "roi_percentage": -49.7,
+      "execution_status": "MONITORING",
+      "cost_usd": 0,
+      "power_recovery_kwh": 0
+    },
+    "performance_metrics": {
+      "total_processing_time_ms": 647.3619937896729,
+      "image_analysis_time_ms": 643.3,
+      "forecast_time_ms": 0.0,
+      "decision_time_ms": 0.0,
+      "execution_time_ms": 0.0,
+      "throughput_images_per_hour": 5561.0
+    }
+  },
+  "total_processing_time_ms": 647.3619937896729
+}

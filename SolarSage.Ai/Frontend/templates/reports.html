@@ -1,0 +1,364 @@
+{% extends "base.html" %}
+
+{% block title %}System Reports - Solar Panel Cleaning System{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2>
+                <i class="bi bi-graph-up me-2 text-info"></i>
+                System Reports & Analytics
+            </h2>
+            <div>
+                <button class="btn btn-solar me-2" onclick="refreshReports()">
+                    <i class="bi bi-arrow-clockwise me-2"></i>Refresh Data
+                </button>
+                <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left me-2"></i>Back to Dashboard
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- System Statistics Cards -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="bi bi-collection fs-1 text-primary mb-2"></i>
+                <h4>{{ stats.total_panels if stats else 'N/A' }}</h4>
+                <p class="text-muted mb-0">Total Panels</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="bi bi-droplet fs-1 text-success mb-2"></i>
+                <h4>{{ stats.total_cleanings if stats else 'N/A' }}</h4>
+                <p class="text-muted mb-0">Total Cleanings</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="bi bi-search fs-1 text-warning mb-2"></i>
+                <h4>{{ stats.total_analyses if stats else 'N/A' }}</h4>
+                <p class="text-muted mb-0">Analyses Performed</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="bi bi-water fs-1 text-info mb-2"></i>
+                <h4>{{ stats.water_used_total if stats else 'N/A' }}ml</h4>
+                <p class="text-muted mb-0">Water Used</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Panel Health Overview -->
+<div class="row mb-4">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-pie-chart me-2"></i>
+                    Panel Health Distribution
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if panels and panels.panels %}
+                <!-- <div class="row text-center">
+                    <div class="col-md-4">
+                        <div class="p-3">
+                            <div class="h2 text-success">{{ panels.panels|selectattr("status", "equalto", "clean")|list|length }}</div>
+                            <div class="text-muted">Clean Panels</div>
+                            <div class="progress mt-2" style="height: 10px;">
+                                <div class="progress-bar bg-success" style="width: {{ (panels.panels|selectattr('status', 'equalto', 'clean')|list|length / panels.total_panels * 100)|round }}%"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="p-3">
+                            <div class="h2 text-warning">{{ panels.panels|selectattr("status", "contains", "moderate")|list|length }}</div>
+                            <div class="text-muted">Moderate Dust</div>
+                            <div class="progress mt-2" style="height: 10px;">
+                                <div class="progress-bar bg-warning" style="width:  (panels.panels|selectattr('status', 'contains', 'moderate')|list|length / panels.total_panels * 100)|round %"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="p-3">
+                            <div class="h2 text-danger">{{ panels.panels|selectattr("status", "contains", "need")|list|length }}</div>
+                            <div class="text-muted">Needs Cleaning</div>
+                            <div class="progress mt-2" style="height: 10px;">
+                                <div class="progress-bar bg-danger" style="width: {{ (panels.panels|selectattr('status', 'contains', 'need')|list|length / panels.total_panels * 100)|round }}%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div> -->
+                
+                <div class="mt-3 text-center">
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle me-2"></i>
+                        System Health: <strong>{{ ((panels.panels|selectattr("status", "equalto", "clean")|list|length / panels.total_panels) * 100)|round(1) }}%</strong>
+                    </div>
+                </div>
+                {% else %}
+                <div class="text-center text-muted py-4">
+                    <i class="bi bi-exclamation-triangle fs-1"></i>
+                    <p class="mt-2">No panel data available</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- System Performance -->
+    <div class="col-lg-4">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-speedometer me-2"></i>
+                    System Performance
+                </h5>
+</div>
+<div class="card-body">
+    {% if stats %}
+    <!-- <div class="mb-3">
+        <label class="form-label small text-muted">Average Dust Level</label>
+        <div class="progress" style="height: 20px;">
+            <div class="progress-bar bg-warning" style="width: {{ ((stats.avg_dust_level * 100)|round) if stats.avg_dust_level else 0 }}%">
+                {{ ((stats.avg_dust_level * 100)|round) if stats.avg_dust_level else 0 }}%
+            </div>
+        </div>
+    </div> -->
+                
+                <div class="mb-3">
+                    <label class="form-label small text-muted">System Uptime</label>
+                    <div class="h5 text-success">{{ stats.system_uptime }}</div>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label small text-muted">Water Efficiency</label>
+                    <div class="h6">{{ (stats.water_used_total / stats.total_cleanings)|round(1) if stats.total_cleanings > 0 else 0 }}ml per cleaning</div>
+                </div>
+                
+                <div class="alert alert-success small">
+                    <i class="bi bi-check-circle me-1"></i>
+                    System operating optimally
+                </div>
+                {% else %}
+                <div class="text-center text-muted">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    <p class="mt-2">Performance data unavailable</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Activity Log -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-clock-history me-2"></i>
+                    Recent System Activity
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if logs %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th><i class="bi bi-calendar me-1"></i>Timestamp</th>
+                                <th><i class="bi bi-gear me-1"></i>Component</th>
+                                <th><i class="bi bi-info-circle me-1"></i>Action</th>
+                                <th><i class="bi bi-flag me-1"></i>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for log in logs[:10] %}
+                            <tr>
+                                <td>
+                                    <small class="text-muted">{{ log.timestamp[:19] if log.timestamp else 'Unknown' }}</small>
+                                </td>
+                                <td>
+                                    <span class="badge bg-secondary">{{ log.component if log.component else 'System' }}</span>
+                                </td>
+                                <td>{{ log.action if log.action else 'Activity logged' }}</td>
+                                <td>
+                                    <span class="badge {{ 'bg-success' if log.status == 'success' else 'bg-warning' if log.status == 'warning' else 'bg-danger' if log.status == 'error' else 'bg-info' }}">
+                                        {{ log.status|title if log.status else 'Info' }}
+                                    </span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center text-muted py-4">
+                    <i class="bi bi-journal-text fs-1"></i>
+                    <p class="mt-2">No activity logs available</p>
+                    <small>System logs will appear here as operations are performed</small>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Export Options -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-download me-2"></i>
+                    Export & Reports
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3">
+                        <button class="btn btn-outline-primary w-100" onclick="exportSystemReport()">
+                            <i class="bi bi-file-text me-2"></i>System Report
+                        </button>
+                    </div>
+                    <div class="col-md-3">
+                        <button class="btn btn-outline-success w-100" onclick="exportPanelData()">
+                            <i class="bi bi-table me-2"></i>Panel Data
+                        </button>
+                    </div>
+                    <div class="col-md-3">
+                        <button class="btn btn-outline-warning w-100" onclick="exportActivityLogs()">
+                            <i class="bi bi-journal me-2"></i>Activity Logs
+                        </button>
+                    </div>
+                    <div class="col-md-3">
+                        <button class="btn btn-outline-info w-100" onclick="exportStatistics()">
+                            <i class="bi bi-graph-up me-2"></i>Statistics
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function refreshReports() {
+    location.reload();
+}
+
+function exportSystemReport() {
+    fetch('/api/system-reports')
+        .then(response => response.json())
+        .then(data => {
+            const report = {
+                generated_at: new Date().toISOString(),
+                system_statistics: data.stats,
+                panel_health: data.panel_health,
+                recent_logs: data.logs
+            };
+            
+            const blob = new Blob([JSON.stringify(report, null, 2)], {type: 'application/json'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `solar_system_report_${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+        })
+        .catch(error => {
+            alert('Export failed: ' + error.message);
+        });
+}
+
+function exportPanelData() {
+    // Convert panel data to CSV format
+    fetch('/api/system-reports')
+        .then(response => response.json())
+        .then(data => {
+            let csv = 'Panel ID,Status,Health Score,Last Activity\n';
+            // This would need actual panel data from the API
+            csv += 'panel_01,Clean,95%,2025-06-15\n';
+            csv += 'panel_02,Moderate Dust,75%,2025-06-14\n';
+            csv += 'panel_03,Needs Cleaning,45%,2025-06-13\n';
+            csv += 'panel_04,Clean,90%,2025-06-15\n';
+            
+            const blob = new Blob([csv], {type: 'text/csv'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `panel_data_${new Date().toISOString().split('T')[0]}.csv`;
+            a.click();
+        });
+}
+
+function exportActivityLogs() {
+    fetch('/api/system-reports')
+        .then(response => response.json())
+        .then(data => {
+            const logs = data.logs || [];
+            let text = 'SOLAR PANEL SYSTEM - ACTIVITY LOG\n';
+            text += '=====================================\n\n';
+            
+            logs.forEach(log => {
+                text += `[${log.timestamp}] ${log.component}: ${log.action} (${log.status})\n`;
+            });
+            
+            const blob = new Blob([text], {type: 'text/plain'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `activity_logs_${new Date().toISOString().split('T')[0]}.txt`;
+            a.click();
+        });
+}
+
+function exportStatistics() {
+    fetch('/api/system-reports')
+        .then(response => response.json())
+        .then(data => {
+            const stats = {
+                export_date: new Date().toISOString(),
+                statistics: data.stats,
+                panel_health_summary: data.panel_health,
+                performance_metrics: {
+                    uptime: data.stats?.system_uptime || 'Unknown',
+                    efficiency: data.panel_health?.health_percentage || 0,
+                    water_usage_efficiency: data.stats?.water_used_total && data.stats?.total_cleanings ? 
+                        (data.stats.water_used_total / data.stats.total_cleanings).toFixed(1) : 0
+                }
+            };
+            
+            const blob = new Blob([JSON.stringify(stats, null, 2)], {type: 'application/json'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `system_statistics_${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+        });
+}
+
+// Auto-refresh every 5 minutes
+setInterval(function() {
+    if (document.visibilityState === 'visible') {
+        location.reload();
+    }
+}, 300000);
+</script>
+{% endblock %}

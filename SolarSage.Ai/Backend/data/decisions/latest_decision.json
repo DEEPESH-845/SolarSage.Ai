@@ -1,0 +1,12 @@
+{
+  "decision_id": "decision_20250615_112722",
+  "panel_id": "panel_01",
+  "dust_level": 0.67,
+  "status": "needs_cleaning",
+  "confidence": 0.85,
+  "decision": "spray_now",
+  "action": "\ud83d\udebf Cleaning initiated - High dust detected",
+  "spray_duration": 8,
+  "water_volume": 160,
+  "timestamp": "2025-06-15T11:27:22.815532"
+}

@@ -1,0 +1,26 @@
+{
+  "timestamp": "2025-06-15T10:43:10.678182",
+  "execution_id": "exec_20250615_104310_41e96b77",
+  "execution_status": "MONITORING",
+  "water_used_liters": 0.0,
+  "cost_usd": 0.0,
+  "power_recovery_kwh": 0.0,
+  "estimated_savings_weekly": 0.0,
+  "success_rate": 0.0,
+  "automation_insights": "System in advanced AI monitoring mode with 12-hour intelligent assessment intervals. Continuous dust accumulation tracking via NPU-accelerated computer vision algorithms. Machine learning-powered condition analysis running in real-time. Automated trigger thresholds configured for optimal intervention timing using Llama-enhanced decision protocols.",
+  "next_maintenance": "Next AI assessment in 13 days",
+  "equipment_status": {
+    "ai_monitoring_system": "active",
+    "computer_vision_sensors": "operational",
+    "data_collection": "continuous",
+    "ml_analysis": "running",
+    "npu_processing": "active"
+  },
+  "environmental_conditions": {
+    "monitoring_frequency": "12h",
+    "ai_sensor_network": "active",
+    "data_quality": "high",
+    "npu_acceleration": "monitoring"
+  },
+  "processing_time_ms": 0.0
+}
