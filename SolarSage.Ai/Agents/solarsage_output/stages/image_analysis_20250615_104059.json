@@ -1,0 +1,29 @@
+{
+  "timestamp": "2025-06-15T10:40:59.036930",
+  "image_id": "img_20250615_104059_430314c2",
+  "dust_level": 57.6,
+  "confidence": 92.1,
+  "risk_category": "HIGH",
+  "visual_score": 42.4,
+  "npu_acceleration": true,
+  "image_quality": "HIGH",
+  "ai_insights": [
+    "High dust levels detected - cleaning recommended within 24 hours",
+    "Notable power generation impact expected",
+    "Monitor for rapid dust accumulation",
+    "Very high confidence in analysis - reliable results"
+  ],
+  "processing_time_ms": 1.0,
+  "metadata": {
+    "algorithms_used": [
+      "brightness",
+      "contrast",
+      "saturation",
+      "edge_detection",
+      "texture",
+      "histogram"
+    ],
+    "model_version": "2025.1_production",
+    "analysis_method": "advanced_cv_multi_spectral"
+  }
+}

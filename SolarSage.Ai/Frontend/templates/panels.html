@@ -1,0 +1,320 @@
+{% extends "base.html" %}
+
+{% block title %}Panels Management - Solar Panel Cleaning System{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2>
+                <i class="bi bi-grid-3x3-gap me-2 text-info"></i>
+                Solar Panels Management
+            </h2>
+            <div>
+                <button class="btn btn-solar me-2" onclick="quickAnalyzeAll()">
+                    <i class="bi bi-search me-2"></i>Analyze All Panels
+                </button>
+                <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left me-2"></i>Back to Dashboard
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if panels and panels.panels %}
+<!-- Panels Statistics -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="bi bi-collection fs-1 text-primary mb-2"></i>
+                <h4>{{ panels.total_panels }}</h4>
+                <p class="text-muted mb-0">Total Panels</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="bi bi-check-circle fs-1 text-success mb-2"></i>
+                <h4>{{ panels.panels|selectattr("status", "equalto", "clean")|list|length }}</h4>
+                <p class="text-muted mb-0">Clean Panels</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="bi bi-exclamation-triangle fs-1 text-warning mb-2"></i>
+                <h4>{{ panels.panels|selectattr("status", "match", ".*moderate.*")|list|length }}</h4>
+                <p class="text-muted mb-0">Moderate Dust</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="bi bi-exclamation-circle fs-1 text-danger mb-2"></i>
+                <h4>{{ panels.panels|selectattr("status", "match", ".*need.*")|list|length }}</h4>
+                <p class="text-muted mb-0">Needs Cleaning</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Detailed Panels Table -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-table me-2"></i>
+                    Panel Details
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th><i class="bi bi-hash me-1"></i>Panel ID</th>
+                                <th><i class="bi bi-speedometer me-1"></i>Status</th>
+                                <th><i class="bi bi-calendar me-1"></i>Last Cleaned</th>
+                                <th><i class="bi bi-droplet me-1"></i>Next Action</th>
+                                <th><i class="bi bi-tools me-1"></i>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for panel in panels.panels %}
+                            <tr>
+                                <td>
+                                    <strong>{{ panel.id|title }}</strong>
+                                </td>
+                                <td>
+                                    <span class="status-badge {{ 'status-clean' if panel.status == 'clean' else 'status-moderate' if 'moderate' in panel.status else 'status-dirty' }}">
+                                        <i class="bi bi-{{ 'check-circle' if panel.status == 'clean' else 'exclamation-triangle' if 'moderate' in panel.status else 'exclamation-circle' }} me-1"></i>
+                                        {{ panel.status.replace('_', ' ')|title }}
+                                    </span>
+                                </td>
+                                <td>{{ panel.last_cleaned }}</td>
+                                <td>
+                                    {% if panel.status == 'clean' %}
+                                        <span class="text-success">
+                                            <i class="bi bi-check me-1"></i>No action needed
+                                        </span>
+                                    {% elif 'moderate' in panel.status %}
+                                        <span class="text-warning">
+                                            <i class="bi bi-clock me-1"></i>Schedule cleaning
+                                        </span>
+                                    {% else %}
+                                        <span class="text-danger">
+                                            <i class="bi bi-droplet me-1"></i>Clean immediately
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="btn-group" role="group">
+                                        <a href="{{ url_for('analyze_panel', panel_id=panel.id) }}" 
+                                           class="btn btn-outline-primary btn-sm"
+                                           title="Analyze Panel">
+                                            <i class="bi bi-search"></i>
+                                        </a>
+                                        <a href="{{ url_for('spray_panel', panel_id=panel.id) }}" 
+                                           class="btn btn-outline-success btn-sm"
+                                           title="Clean Panel">
+                                            <i class="bi bi-droplet"></i>
+                                        </a>
+                                        <button class="btn btn-outline-info btn-sm" 
+                                                onclick="showPanelDetails('{{ panel.id }}')"
+                                                title="View Details">
+                                            <i class="bi bi-info-circle"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bulk Actions -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-lightning me-2"></i>
+                    Bulk Operations
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="text-center p-3 border rounded">
+                            <i class="bi bi-search fs-2 text-primary mb-2"></i>
+                            <h6>Analyze All</h6>
+                            <p class="text-muted small">Run dust analysis on all panels</p>
+                            <button class="btn btn-primary btn-sm" onclick="quickAnalyzeAll()">
+                                <i class="bi bi-play me-1"></i>Start Analysis
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="text-center p-3 border rounded">
+                            <i class="bi bi-droplet fs-2 text-success mb-2"></i>
+                            <h6>Clean Dirty Panels</h6>
+                            <p class="text-muted small">Clean only panels that need it</p>
+                            <button class="btn btn-success btn-sm" onclick="cleanDirtyPanels()">
+                                <i class="bi bi-play me-1"></i>Start Cleaning
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="text-center p-3 border rounded">
+                            <i class="bi bi-calendar-check fs-2 text-info mb-2"></i>
+                            <h6>Schedule Maintenance</h6>
+                            <p class="text-muted small">Set up automated cleaning schedule</p>
+                            <button class="btn btn-info btn-sm" disabled>
+                                <i class="bi bi-calendar me-1"></i>Coming Soon
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% else %}
+<!-- No Panels Available -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body text-center py-5">
+                <i class="bi bi-grid fs-1 text-muted mb-3"></i>
+                <h4 class="text-muted">No Panels Data Available</h4>
+                <p class="text-muted">Unable to connect to the backend system or no panels are configured.</p>
+                <a href="{{ url_for('dashboard') }}" class="btn btn-primary">
+                    <i class="bi bi-arrow-left me-2"></i>Back to Dashboard
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Panel Details Modal -->
+<div class="modal fade" id="panelDetailsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-info-circle me-2"></i>
+                    Panel Details
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="panelDetailsContent">
+                <!-- Content will be loaded dynamically -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function showPanelDetails(panelId) {
+    // Show modal with panel details
+    const modal = new bootstrap.Modal(document.getElementById('panelDetailsModal'));
+    const content = document.getElementById('panelDetailsContent');
+    
+    content.innerHTML = `
+        <div class="text-center">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2">Loading panel details...</p>
+        </div>
+    `;
+    
+    modal.show();
+    
+    // Simulate loading panel details (you can replace this with actual API call)
+    setTimeout(() => {
+        content.innerHTML = `
+            <div class="row">
+                <div class="col-md-6">
+                    <h6>Panel Information</h6>
+                    <table class="table table-sm">
+                        <tr><td><strong>Panel ID:</strong></td><td>${panelId}</td></tr>
+                        <tr><td><strong>Location:</strong></td><td>Roof Section A</td></tr>
+                        <tr><td><strong>Installation Date:</strong></td><td>2024-01-15</td></tr>
+                        <tr><td><strong>Last Maintenance:</strong></td><td>2024-06-10</td></tr>
+                    </table>
+                </div>
+                <div class="col-md-6">
+                    <h6>Performance Metrics</h6>
+                    <table class="table table-sm">
+                        <tr><td><strong>Efficiency:</strong></td><td>92%</td></tr>
+                        <tr><td><strong>Power Output:</strong></td><td>340W</td></tr>
+                        <tr><td><strong>Temperature:</strong></td><td>45°C</td></tr>
+                        <tr><td><strong>Cleaning Cycles:</strong></td><td>15</td></tr>
+                    </table>
+                </div>
+            </div>
+            <div class="mt-3">
+                <h6>Recent Activity</h6>
+                <div class="alert alert-info">
+                    <i class="bi bi-clock me-2"></i>
+                    Last analyzed: 2 hours ago - Moderate dust detected
+                </div>
+                <div class="alert alert-success">
+                    <i class="bi bi-droplet me-2"></i>
+                    Last cleaned: 3 days ago - Cleaning successful
+                </div>
+            </div>
+        `;
+    }, 1000);
+}
+
+function cleanDirtyPanels() {
+    if (confirm('Clean all panels that need attention? This may use significant water.')) {
+        const btn = event.target;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Cleaning...';
+        
+        fetch('/api/clean-dirty-panels')
+            .then(response => response.json())
+            .then(data => {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-play me-1"></i>Start Cleaning';
+                
+                if (data.panels_cleaned !== undefined) {
+                    if (data.panels_cleaned === 0) {
+                        alert('✅ ' + data.message);
+                    } else {
+                        alert(`✅ ${data.message}\n\nDetails:\n- Dirty panels found: ${data.dirty_panels_found}\n- Panels cleaned: ${data.panels_cleaned}\n- Water used: ${data.total_water_used}ml`);
+                        location.reload();
+                    }
+                } else {
+                    alert('❌ Cleaning failed: ' + (data.error || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-play me-1"></i>Start Cleaning';
+                alert('❌ Cleaning failed: ' + error.message);
+            });
+    }
+}
+</script>
+{% endblock %}
