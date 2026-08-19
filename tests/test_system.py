@@ -54,6 +54,29 @@ def test_classifier_reads_the_image_fixtures():
     assert "error" in missing, missing
 
 
+def test_fixtures_are_distinct_and_cover_every_decision_band():
+    """They used to be four copies of one file, so every panel reported the same
+    dust level and only one branch of the decision logic was ever exercised."""
+    import hashlib
+
+    from Backend.agents.image_classifier import ImageClassifierAgent
+
+    images = [settings.image_dir / f"{p}_test.jpg" for p in settings.panel_ids]
+    digests = {hashlib.md5(i.read_bytes()).hexdigest() for i in images}
+    assert len(digests) == len(images), "the panel fixtures are not distinct images"
+
+    agent = ImageClassifierAgent()
+    coverage = [agent.classify_dust_level(i)["dust_level"] * 100 for i in images]
+    assert coverage == sorted(coverage), f"fixtures should soil progressively: {coverage}"
+
+    defaults = services.DEFAULT_SETTINGS
+    assert coverage[0] < defaults["schedule_threshold"], f"panel_01 should read clean: {coverage[0]}"
+    assert defaults["schedule_threshold"] < coverage[1] < defaults["dust_threshold"], (
+        f"panel_02 should land between the thresholds: {coverage[1]}")
+    assert coverage[2] > defaults["dust_threshold"], f"panel_03 should need cleaning: {coverage[2]}"
+    assert coverage[3] > defaults["dust_threshold"], f"panel_04 should need cleaning: {coverage[3]}"
+
+
 def test_the_same_frame_always_reads_the_same():
     """The classifier used to add Gaussian noise to its own measurement, so one
     image produced a different dust level on every run and the cleaning

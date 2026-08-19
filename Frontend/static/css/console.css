@@ -47,8 +47,8 @@
   padding: 0.62rem 0.75rem;
   border-radius: var(--radius-sm);
   font-family: var(--font-mono);
-  font-size: 0.76rem;
-  letter-spacing: 0.1em;
+  font-size: 0.74rem;
+  letter-spacing: var(--control-track);
   text-transform: uppercase;
   color: var(--ink-dim);
   transition: color 0.25s var(--ease-out), background-color 0.25s var(--ease-out);
@@ -120,7 +120,7 @@ h1.topbar__title { font-size: clamp(1.6rem, 2.6vw, 2.2rem); margin-top: 0.45rem;
 .console-page {
   padding: 0.5rem clamp(1.25rem, 3vw, 2.5rem) 4rem;
   display: grid;
-  gap: 1.25rem;
+  gap: var(--space-4);
 }
 
 /* Grid and flex children default to min-width:auto, which lets a wide table push
@@ -189,7 +189,7 @@ h1.topbar__title { font-size: clamp(1.6rem, 2.6vw, 2.2rem); margin-top: 0.45rem;
 }
 
 /* water tank: a cell you can read across the room */
-.tankrow { display: flex; gap: 1.5rem; align-items: stretch; }
+.tankrow { display: flex; gap: var(--space-5); align-items: stretch; }
 
 .tank {
   position: relative;
@@ -240,7 +240,7 @@ h1.topbar__title { font-size: clamp(1.6rem, 2.6vw, 2.2rem); margin-top: 0.45rem;
 }
 
 .tankrow__facts { display: flex; flex-direction: column; gap: 0.4rem; align-items: flex-start; }
-.tankrow__value { font-size: 2.4rem; }
+
 .tankrow__facts .btn { margin-top: auto; }
 
 .decision__action {
@@ -254,11 +254,11 @@ h1.topbar__title { font-size: clamp(1.6rem, 2.6vw, 2.2rem); margin-top: 0.45rem;
 .decision__grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 1rem;
-  margin: 1.4rem 0;
+  gap: var(--space-4);
+  margin: var(--space-5) 0;
 }
 
-.decision__value { font-size: 1.6rem; margin-top: 0.4rem; }
+.decision__value { margin-top: var(--space-2); }
 .decision__unit { font-size: 0.8rem; color: var(--ink-faint); margin-left: 2px; }
 
 .econ {
@@ -293,14 +293,9 @@ h1.topbar__title { font-size: clamp(1.6rem, 2.6vw, 2.2rem); margin-top: 0.45rem;
 
 /* ------------------------------------------------------------ panel cards */
 
-.panelgrid { --grid-gap: 1rem; }
+
 
 .panelcard {
-  position: relative;
-  padding: 1.15rem;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--wafer-800);
   overflow: hidden;
   transition: border-color 0.3s var(--ease-out);
 }
@@ -315,12 +310,20 @@ h1.topbar__title { font-size: clamp(1.6rem, 2.6vw, 2.2rem); margin-top: 0.45rem;
 
 .panelcard:hover { border-color: var(--line-strong); }
 
-.panelcard__id { font-size: 0.78rem; letter-spacing: 0.12em; text-transform: uppercase; white-space: nowrap; }
-.panelcard > header { flex-wrap: wrap; row-gap: 0.5rem; }
-.panelcard__dust { font-size: 2.1rem; margin: 1.1rem 0 0.7rem; }
+.panelcard__id { font-size: var(--micro-size); letter-spacing: var(--control-track); text-transform: uppercase; white-space: nowrap; }
+
+/* Stacked, not side by side: a wider status pill used to wrap on some cards and
+   not others, so the dust figures in one row no longer lined up. */
+.panelcard > header {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+.panelcard__dust { margin: var(--space-4) 0 var(--space-3); }
 .panelcard__unit { font-size: 0.72rem; color: var(--ink-faint); margin-left: 0.3rem; letter-spacing: 0.06em; }
 .panelcard__dust { display: flex; align-items: baseline; }
-.panelcard__meter { margin-bottom: 1rem; }
+.panelcard__meter { margin-bottom: var(--space-4); }
 
 .panelcard__meta { font-size: 0.78rem; }
 
@@ -335,7 +338,7 @@ h1.topbar__title { font-size: clamp(1.6rem, 2.6vw, 2.2rem); margin-top: 0.45rem;
 .panelcard__meta dt { color: var(--ink-faint); }
 .panelcard__meta dd { font-family: var(--font-mono); }
 
-.panelcard__actions { display: flex; gap: 0.5rem; margin-top: 1rem; }
+.panelcard__actions { display: flex; gap: var(--space-2); margin-top: var(--space-4); }
 .panelcard__actions .btn { flex: 1; }
 
 /* ---------------------------------------------------------------- actions */
@@ -354,16 +357,10 @@ h1.topbar__title { font-size: clamp(1.6rem, 2.6vw, 2.2rem); margin-top: 0.45rem;
   align-items: center;
 }
 
-.statgrid { --grid-gap: 1rem; }
 
-.statcard {
-  padding: 1.25rem;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--wafer-800);
-}
 
-.statcard__value { font-size: 2.4rem; margin: 0.7rem 0 0.2rem; }
+/* Surface comes from .card; these classes only say what is specific to them. */
+.statcard__value { margin: var(--space-3) 0 var(--space-1); }
 .statcard__note { font-size: 0.78rem; color: var(--ink-faint); }
 
 /* --------------------------------------------------------- detail dialog */
@@ -403,7 +400,7 @@ h1.topbar__title { font-size: clamp(1.6rem, 2.6vw, 2.2rem); margin-top: 0.45rem;
   display: grid;
   align-items: start;
   grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
-  gap: 1.25rem;
+  gap: var(--space-4);
 }
 
 @media (max-width: 1000px) {
@@ -423,7 +420,7 @@ h1.topbar__title { font-size: clamp(1.6rem, 2.6vw, 2.2rem); margin-top: 0.45rem;
   text-align: center;
 }
 
-.donut__value { font-size: 1.9rem; }
+
 .donut__legend { flex: 1; min-width: 12rem; font-size: 0.86rem; }
 
 .donut__legend > div {
@@ -439,8 +436,8 @@ h1.topbar__title { font-size: clamp(1.6rem, 2.6vw, 2.2rem); margin-top: 0.45rem;
 
 .loglevel {
   font-family: var(--font-mono);
-  font-size: 0.66rem;
-  letter-spacing: 0.12em;
+  font-size: var(--micro-size);
+  letter-spacing: var(--control-track);
   padding: 0.2rem 0.5rem;
   border-radius: 3px;
   border: 1px solid currentColor;
@@ -459,7 +456,8 @@ h1.topbar__title { font-size: clamp(1.6rem, 2.6vw, 2.2rem); margin-top: 0.45rem;
 .settings__grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1.25rem;
+  gap: var(--space-4);
+  align-items: start;  /* same rule as the dashboard: cards keep their own height */
 }
 
 @media (max-width: 900px) {
@@ -469,7 +467,7 @@ h1.topbar__title { font-size: clamp(1.6rem, 2.6vw, 2.2rem); margin-top: 0.45rem;
 .settings__actions {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0.75rem;
+  gap: var(--space-3);
 }
 
 @media (max-width: 820px) {

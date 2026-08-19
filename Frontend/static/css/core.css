@@ -67,6 +67,30 @@
   --radius: 12px;
   --radius-lg: 20px;
 
+  /* Spacing: a 4px scale. Every gap, pad and margin comes from here, so rhythm
+     is a choice between eight values rather than a fresh decimal each time. */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+  --space-8: 4rem;
+
+  /* Metrics: four sizes for a number, chosen by how much of the page it owns. */
+  --metric-xl: clamp(2.2rem, 5vw, 3.4rem);
+  --metric-lg: 2.25rem;
+  --metric-md: 1.75rem;
+  --metric-sm: 1.4rem;
+
+  /* Micro-type: one treatment for data labels, one for section eyebrows, one
+     for controls. Every uppercase-mono run picks one of these three. */
+  --micro-size: 0.68rem;
+  --micro-track: 0.14em;
+  --eyebrow-track: 0.2em;
+  --control-track: 0.12em;
+
   --shell: min(1240px, 92vw);
   --gutter: clamp(1.25rem, 4vw, 3rem);
 
@@ -136,12 +160,12 @@ h3.display { font-size: clamp(1.35rem, 2.4vw, 1.9rem); line-height: 1.05; }
   font-family: var(--font-mono);
   font-size: 0.7rem;
   font-weight: 500;
-  letter-spacing: 0.22em;
+  letter-spacing: var(--eyebrow-track);
   text-transform: uppercase;
   color: var(--ink-dim);
   display: flex;
   align-items: center;
-  gap: 0.7rem;
+  gap: var(--space-3);
 }
 
 .eyebrow::before {
@@ -170,8 +194,8 @@ h3.display { font-size: clamp(1.35rem, 2.4vw, 1.9rem); line-height: 1.05; }
 
 .label {
   font-family: var(--font-mono);
-  font-size: 0.68rem;
-  letter-spacing: 0.16em;
+  font-size: var(--micro-size);
+  letter-spacing: var(--micro-track);
   text-transform: uppercase;
   color: var(--ink-faint);
 }
@@ -183,7 +207,14 @@ h3.display { font-size: clamp(1.35rem, 2.4vw, 1.9rem); line-height: 1.05; }
   letter-spacing: -0.03em;
   font-variant-numeric: tabular-nums;
   line-height: 1;
+  font-size: var(--metric, var(--metric-md));
 }
+
+/* Pick the weight a number carries on the page, not a one-off size. */
+.numeral--xl { --metric: var(--metric-xl); }
+.numeral--lg { --metric: var(--metric-lg); }
+.numeral--md { --metric: var(--metric-md); }
+.numeral--sm { --metric: var(--metric-sm); }
 
 .text-sun { color: var(--sun); }
 .text-dust { color: var(--dust); }
@@ -203,7 +234,7 @@ h3.display { font-size: clamp(1.35rem, 2.4vw, 1.9rem); line-height: 1.05; }
 
 .stack > * + * { margin-top: var(--stack-gap, 1rem); }
 
-.grid { display: grid; gap: var(--grid-gap, 1.25rem); }
+.grid { display: grid; gap: var(--grid-gap, var(--space-4)); }
 .grid--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .grid--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .grid--4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
@@ -247,16 +278,25 @@ h3.display { font-size: clamp(1.35rem, 2.4vw, 1.9rem); line-height: 1.05; }
    surfaces
    -------------------------------------------------------------------------- */
 
+/* Every raised block on either page is this one surface. Components set
+   --card-pad when they need to sit tighter or looser; nothing else redeclares
+   the background, border or radius. */
+.card,
 .panel {
   position: relative;
   background:
-    linear-gradient(180deg, rgba(198, 208, 228, 0.045), rgba(198, 208, 228, 0)) ,
+    linear-gradient(180deg, rgba(198, 208, 228, 0.045), rgba(198, 208, 228, 0)),
     var(--wafer-800);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  padding: var(--panel-pad, 1.5rem);
+  padding: var(--card-pad, var(--space-5));
+  min-width: 0;
 }
 
+.card--tight,
+.panel--tight { --card-pad: var(--space-4); }
+.card--loose { --card-pad: var(--space-6); }
+.card--raised,
 .panel--raised { background-color: var(--wafer-700); }
 
 .panel__head {
@@ -264,8 +304,8 @@ h3.display { font-size: clamp(1.35rem, 2.4vw, 1.9rem); line-height: 1.05; }
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 0.75rem 1rem;
-  margin-bottom: 1.25rem;
+  gap: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-5);
 }
 
 .panel__title {
@@ -381,8 +421,8 @@ h3.display { font-size: clamp(1.35rem, 2.4vw, 1.9rem); line-height: 1.05; }
   border: 1px solid var(--line-strong);
   border-radius: 999px;
   font-family: var(--font-mono);
-  font-size: 0.68rem;
-  letter-spacing: 0.12em;
+  font-size: var(--micro-size);
+  letter-spacing: var(--control-track);
   text-transform: uppercase;
   white-space: nowrap;
 }
@@ -462,8 +502,8 @@ h3.display { font-size: clamp(1.35rem, 2.4vw, 1.9rem); line-height: 1.05; }
 .toast__body { flex: 1; min-width: 0; }
 .toast__title {
   font-family: var(--font-mono);
-  font-size: 0.66rem;
-  letter-spacing: 0.16em;
+  font-size: var(--micro-size);
+  letter-spacing: var(--micro-track);
   text-transform: uppercase;
   color: var(--ink-faint);
   margin-bottom: 0.15rem;
@@ -530,9 +570,9 @@ table.data {
 
 table.data th {
   font-family: var(--font-mono);
-  font-size: 0.66rem;
+  font-size: var(--micro-size);
   font-weight: 500;
-  letter-spacing: 0.14em;
+  letter-spacing: var(--micro-track);
   text-transform: uppercase;
   color: var(--ink-faint);
   text-align: left;
