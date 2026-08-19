@@ -133,6 +133,146 @@ SolarSage employs 4 specialized AI agents that collaborate to optimize solar pan
 
 ![Metrics](assets/6.png)
 ---
+---
+
+## 🗂️ Project Structure
+
+```
+├── app.py                     # WSGI entrypoint (Vercel + `python app.py`)
+├── run_system.py              # Local launcher: FastAPI backend + Flask frontend
+├── requirements.txt           # Runtime dependencies
+├── vercel.json                # Serverless function config
+├── Backend/
+│   ├── services.py            # Business logic — the single source of truth
+│   ├── agents/
+│   │   └── image_classifier.py    # Adapter onto the CV pipeline in Agents/crew.py
+│   ├── api/main.py            # FastAPI: thin HTTP layer over services
+│   ├── config/settings.py     # Deployment config (paths, ports, tank capacity)
+│   └── database/              # SQLAlchemy models + session handling
+├── Frontend/
+│   ├── app.py                 # Flask UI, calls services in-process
+│   └── templates/             # Dashboard, panels, reports, settings
+├── Agents/crew.py             # CV → forecast → decision → execution pipeline
+├── Hardware/                  # ESP32 firmware, MQTT tooling, captured telemetry
+└── tests/test_system.py       # End-to-end checks against a temp database
+```
+
+**How the pieces connect.** `Backend/services.py` holds every operation; both the
+FastAPI backend and the Flask frontend are thin layers over it. The frontend
+therefore needs no running backend — it calls the same functions in-process,
+which is what lets the whole app deploy as a single serverless function. The
+FastAPI service remains available for hardware and external API clients.
+
+Analysis flows: `Frontend` → `services.analyze_panel` →
+`Backend/agents/image_classifier` → `Agents/crew.py`
+(computer vision → 48h forecast → economic decision) → SQLite.
+
+---
+
+## 🚀 Quick Start
+
+```bash
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+
+python run_system.py           # backend :8000 + frontend :5000
+```
+
+| Service | URL |
+|---|---|
+| Dashboard | http://localhost:5000 |
+| REST API | http://localhost:8000 |
+| API docs | http://localhost:8000/docs |
+
+Run either half on its own:
+
+```bash
+python app.py                                        # frontend only
+python -m uvicorn Backend.api.main:app --reload      # backend only
+```
+
+> **macOS:** AirPlay Receiver occupies port 5000. Either disable it under
+> System Settings → General → AirDrop & Handoff, or run
+> `FRONTEND_PORT=5001 python run_system.py`.
+
+---
+
+## ⚙️ Configuration
+
+Deployment settings come from the environment (or a `.env` file); operational
+settings are edited on the Settings page and stored in the database.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `DATA_DIR` | `Backend/data` (`/tmp/solarsage` on serverless) | Writable storage for the database and decision files |
+| `SQLITE_DATABASE_PATH` | `<DATA_DIR>/solar_panel_system.db` | Explicit database path |
+| `FRONTEND_PORT` / `API_PORT` | `5000` / `8000` | Server ports |
+| `BACKEND_URL` | unset | Set it to call a remote FastAPI backend over HTTP instead of in-process |
+| `SECRET_KEY` | dev fallback | Flask session signing — set this in production |
+| `CORS_ORIGINS` | `http://localhost:5000` | Comma-separated origins allowed to call the API |
+| `WATER_TANK_CAPACITY_ML` | `5000` | Tank size used for water-level reporting |
+
+Runtime settings (dust thresholds, spray duration, water pressure, auto-clean,
+notifications, schedule, paused/active mode) live in the `system_settings`
+table and are editable from the UI.
+
+---
+
+## 🧪 Testing
+
+```bash
+pip install -r requirements-dev.txt
+python tests/test_system.py
+```
+
+Covers the CV pipeline against the bundled image fixtures, threshold-driven
+decisions, auto-clean gating, water-tank and pause guards, hardware telemetry
+parsing, and every FastAPI and Flask route. It runs against a temporary
+database and never touches the real one.
+
+---
+
+## 🔌 API Reference
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/health` | Water level, camera status, temperature from telemetry |
+| `GET` | `/panels` | All panels with status, dust level and last cleaning |
+| `GET` | `/panels/{id}/history` | Analysis and cleaning history |
+| `POST` | `/analyze` | Run the CV + forecast + decision pipeline for a panel |
+| `POST` | `/spray` | Execute a cleaning cycle |
+| `GET` | `/latest-decision` | Most recent decision with its economic analysis |
+| `GET` | `/system/stats` | Totals, average dust level, water usage, uptime |
+| `GET` | `/system/logs` | Recent system log entries |
+| `GET`/`PUT` | `/settings` | Read or update runtime settings |
+| `POST` | `/settings/reset` | Restore default settings |
+| `POST` | `/system/refill-tank` | Reset the water-tank counter |
+| `GET` | `/hardware/telemetry` | Latest ESP32 capture from `Hardware/` |
+
+---
+
+## ☁️ Deployment (Vercel)
+
+Live: **https://solarsage-ai.vercel.app**
+
+```bash
+npm i -g vercel
+vercel link
+vercel env add SECRET_KEY production     # generate with: python -c "import secrets;print(secrets.token_hex(32))"
+vercel --prod
+```
+
+Vercel serves `app.py` as a single Python function. `DATA_DIR` defaults to
+`/tmp/solarsage` automatically when the `VERCEL` environment variable is
+present, because serverless filesystems are read-only apart from `/tmp`.
+
+**Storage caveat:** `/tmp` is per-instance and cleared when an instance
+recycles, so the deployed database is ephemeral — fine for a demo, but point
+`SQLITE_DATABASE_PATH` at persistent storage (or move to Postgres) for real
+deployments. Panel images and hardware captures ship with the bundle and are
+read-only, so they always work.
+
+
 ## 📎 License
 This project was developed for the Qualcomm Edge AI Developer Hackathon 2025. For academic or non-commercial use only. Contact maintainers for other licensing.
 

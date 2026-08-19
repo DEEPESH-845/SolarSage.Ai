@@ -1,7 +1,12 @@
 from sqlalchemy import Column, Integer, String, Float, DateTime, Text, Boolean
-from sqlalchemy.ext.declarative import declarative_base
-from datetime import datetime
+from sqlalchemy.orm import declarative_base
+from datetime import datetime, timezone
 import json
+
+
+def utcnow():
+    """Naive UTC timestamp (datetime.utcnow() is deprecated in 3.12+)."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 Base = declarative_base()
 
@@ -10,7 +15,7 @@ class PanelStatus(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     panel_id = Column(String(50), index=True, nullable=False)
-    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False)
+    timestamp = Column(DateTime, default=utcnow, nullable=False)
     dust_level = Column(Float)
     classification_confidence = Column(Float)
     is_dirty = Column(Boolean, default=False)
@@ -34,7 +39,7 @@ class CleaningAction(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     panel_id = Column(String(50), index=True, nullable=False)
-    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False)
+    timestamp = Column(DateTime, default=utcnow, nullable=False)
     action_type = Column(String(20), nullable=False)  # "spray", "schedule", "skip"
     water_volume = Column(Float)
     duration = Column(Float)
@@ -58,7 +63,7 @@ class SystemDecision(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     decision_id = Column(String(50), unique=True, index=True, nullable=False)
-    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False)
+    timestamp = Column(DateTime, default=utcnow, nullable=False)
     decision_data = Column(Text, nullable=False)  # JSON string
     panels_involved = Column(String(500))  # Comma-separated panel IDs
     action_taken = Column(String(50))
@@ -79,7 +84,7 @@ class SystemLog(Base):
     __tablename__ = "system_logs"
     
     id = Column(Integer, primary_key=True, index=True)
-    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False)
+    timestamp = Column(DateTime, default=utcnow, nullable=False)
     level = Column(String(10), nullable=False)  # INFO, WARNING, ERROR
     component = Column(String(50), nullable=False)  # agent name or system component
     message = Column(Text, nullable=False)
@@ -93,4 +98,20 @@ class SystemLog(Base):
             "component": self.component,
             "message": self.message,
             "details": json.loads(self.details) if self.details else {}
+        }
+
+class SystemSetting(Base):
+    """Runtime-tunable configuration, editable from the settings page."""
+
+    __tablename__ = "system_settings"
+
+    key = Column(String(50), primary_key=True)
+    value = Column(Text, nullable=False)  # JSON-encoded
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
+
+    def to_dict(self):
+        return {
+            "key": self.key,
+            "value": json.loads(self.value),
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }

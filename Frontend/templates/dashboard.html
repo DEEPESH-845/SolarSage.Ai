@@ -85,10 +85,53 @@
                     </div>
                 </div>
                 
+                {% set a = latest_decision.analysis %}
+                {% if a %}
+                <div class="row text-center g-2 mb-3">
+                    <div class="col-4">
+                        <div class="p-2 bg-light rounded">
+                            <div class="fw-bold">{{ a.daily_power_loss_kwh }} kWh</div>
+                            <div class="small text-muted">Daily loss ({{ a.power_loss_percentage }}%)</div>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="p-2 bg-light rounded">
+                            <div class="fw-bold">${{ a.estimated_savings_weekly }}</div>
+                            <div class="small text-muted">Weekly savings</div>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="p-2 bg-light rounded">
+                            <div class="fw-bold">{{ a.optimal_cleaning_window.replace('_', ' ')|title }}</div>
+                            <div class="small text-muted">Cleaning window</div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
                 <div class="alert alert-info">
                     <i class="bi bi-info-circle me-2"></i>
                     {{ latest_decision.action }}
+                    {% if latest_decision.auto_clean %}
+                        {% if latest_decision.auto_clean.error %}
+                        <div class="mt-2 small text-danger">
+                            <i class="bi bi-exclamation-triangle me-1"></i>{{ latest_decision.auto_clean.error }}
+                        </div>
+                        {% else %}
+                        <div class="mt-2 small">
+                            <i class="bi bi-check2-circle me-1"></i>
+                            Auto-cleaned: {{ latest_decision.auto_clean.water_used_ml }}ml over
+                            {{ latest_decision.auto_clean.duration_seconds }}s
+                        </div>
+                        {% endif %}
+                    {% endif %}
                 </div>
+
+                {% if a and a.insights %}
+                <ul class="small text-muted mb-2">
+                    {% for insight in a.insights[:3] %}<li>{{ insight }}</li>{% endfor %}
+                </ul>
+                {% endif %}
                 
                 <small class="text-muted">
                     <i class="bi bi-clock me-1"></i>
@@ -98,7 +141,7 @@
                 <div class="text-center text-muted">
                     <i class="bi bi-search fs-1"></i>
                     <p class="mt-2">No decisions made yet</p>
-                    <button class="btn btn-solar" onclick="quickAnalyzeAll()" id="quick-analyze-btn">
+                    <button class="btn btn-solar" onclick="quickAnalyzeAll(event)" id="quick-analyze-btn">
                         <i class="bi bi-search me-2"></i>Quick Analyze All
                     </button>
                 </div>
@@ -120,7 +163,7 @@
                     </h5>
                     
                     <div>
-                        <button class="btn btn-solar btn-sm me-2" onclick="quickAnalyzeAll()" id="quick-analyze-btn-2">
+                        <button class="btn btn-solar btn-sm me-2" onclick="quickAnalyzeAll(event)" id="quick-analyze-btn-2">
                             <i class="bi bi-search me-2"></i>Analyze All
                         </button>
                         <a href="{{ url_for('panels_page') }}" class="btn btn-outline-primary btn-sm">
@@ -195,7 +238,7 @@
                 <i class="bi bi-lightning-charge fs-1 text-warning mb-3"></i>
                 <h6>Emergency Clean All</h6>
                 <p class="text-muted small">Initiate cleaning for all panels immediately</p>
-                <button class="btn btn-warning btn-sm" onclick="emergencyCleanAll()">
+                <button class="btn btn-warning btn-sm" onclick="emergencyCleanAll(event)">
                     <i class="bi bi-exclamation-triangle me-2"></i>Emergency Clean
                 </button>
             </div>
@@ -218,34 +261,37 @@
 
 {% block scripts %}
 <script>
-function emergencyCleanAll() {
-    if (confirm('Are you sure you want to start emergency cleaning for ALL panels? This will use significant water.')) {
-        const btn = event.target;
-        btn.disabled = true;
-        btn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Cleaning...';
-        
-        fetch('/api/emergency-clean-all')
-            .then(response => response.json())
-            .then(data => {
-                btn.disabled = false;
-                btn.innerHTML = '<i class="bi bi-exclamation-triangle me-2"></i>Emergency Clean';
-                
-                if (data.results) {
-                    alert(`${data.message}\n\nDetails:\n- Panels cleaned: ${data.successful_cleanings}/${data.total_panels}\n- Water used: ${data.total_water_used}ml`);
-                    location.reload();
-                } else {
-                    alert('Emergency cleaning failed: ' + (data.error || 'Unknown error'));
-                }
-            })
-            .catch(error => {
-                btn.disabled = false;
-                btn.innerHTML = '<i class="bi bi-exclamation-triangle me-2"></i>Emergency Clean';
-                alert('Emergency cleaning failed: ' + error.message);
-            });
-    }
-}
+function emergencyCleanAll(event) {
+    if (!confirm('Are you sure you want to start emergency cleaning for ALL panels? This will use significant water.')) return;
 
-// Duplicate quick analyze function for second button
-document.getElementById('quick-analyze-btn-2').addEventListener('click', quickAnalyzeAll);
+    const btn = event.currentTarget;
+    const label = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Cleaning...';
+
+    fetch('/api/emergency-clean-all')
+        .then(response => response.json())
+        .then(data => {
+            btn.disabled = false;
+            btn.innerHTML = label;
+
+            if (data.error) {
+                alert('Emergency cleaning failed: ' + data.error);
+                return;
+            }
+            let msg = `${data.message}\n\nDetails:\n- Panels cleaned: ${data.successful_cleanings}/${data.total_panels}` +
+                      `\n- Water used: ${data.total_water_used}ml`;
+            if (data.failures && data.failures.length) {
+                msg += '\n\nFailed:\n' + data.failures.map(f => `- ${f.panel_id}: ${f.error}`).join('\n');
+            }
+            alert(msg);
+            location.reload();
+        })
+        .catch(error => {
+            btn.disabled = false;
+            btn.innerHTML = label;
+            alert('Emergency cleaning failed: ' + error.message);
+        });
+}
 </script>
 {% endblock %}

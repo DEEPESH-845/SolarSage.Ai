@@ -163,6 +163,11 @@
                         </a>
                     </li>
                     <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('system_reports') }}">
+                            <i class="bi bi-file-earmark-bar-graph me-1"></i>Reports
+                        </a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('settings_page') }}">
                             <i class="bi bi-gear me-1"></i>Settings
                         </a>
@@ -204,7 +209,7 @@
     
     <!-- Custom JavaScript -->
     <script>
-        // Auto-refresh system status every 30 seconds
+        // Auto-refresh system status on the configured interval
         setInterval(function() {
             fetch('/api/status')
                 .then(response => response.json())
@@ -221,40 +226,44 @@
                 .catch(error => {
                     console.log('Status check failed:', error);
                 });
-        }, 30000);
+        }, {{ refresh_interval|int * 1000 }});
 
         // Add smooth scrolling to anchor links
         document.querySelectorAll('a[href^="#"]').forEach(anchor => {
             anchor.addEventListener('click', function (e) {
+                const href = this.getAttribute('href');
+                if (href === '#' || href.length < 2) return;
+                const target = document.querySelector(href);
+                if (!target) return;
                 e.preventDefault();
-                document.querySelector(this.getAttribute('href')).scrollIntoView({
-                    behavior: 'smooth'
-                });
+                target.scrollIntoView({ behavior: 'smooth' });
             });
         });
 
         // Quick analyze function
-        function quickAnalyzeAll() {
-            const btn = document.getElementById('quick-analyze-btn');
-            btn.disabled = true;
-            btn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Analyzing...';
-            
+        function quickAnalyzeAll(event) {
+            const btn = event ? event.currentTarget : null;
+            const label = btn ? btn.innerHTML : '';
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Analyzing...';
+            }
+
             fetch('/api/quick-analyze')
                 .then(response => response.json())
                 .then(data => {
-                    btn.disabled = false;
-                    btn.innerHTML = '<i class="bi bi-search me-2"></i>Quick Analyze All';
-                    
-                    if (data.results) {
-                        alert(`Analysis completed for ${data.total} panels. Check the dashboard for results.`);
-                        location.reload();
-                    } else {
-                        alert('Analysis failed. Please try again.');
+                    if (btn) { btn.disabled = false; btn.innerHTML = label; }
+                    if (data.error) {
+                        alert('Analysis failed: ' + data.error);
+                        return;
                     }
+                    const failed = (data.failed || []).length;
+                    alert(`Analysis completed for ${data.total} panel(s)` +
+                          (failed ? `, ${failed} failed: ${data.failed.join(', ')}` : '') + '.');
+                    location.reload();
                 })
                 .catch(error => {
-                    btn.disabled = false;
-                    btn.innerHTML = '<i class="bi bi-search me-2"></i>Quick Analyze All';
+                    if (btn) { btn.disabled = false; btn.innerHTML = label; }
                     alert('Analysis failed: ' + error.message);
                 });
         }

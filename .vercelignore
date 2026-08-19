@@ -1,0 +1,17 @@
+# Nothing here is needed by the deployed frontend.
+.venv/
+.git/
+.remember/
+__pycache__/
+**/__pycache__/
+assets/
+tests/
+requirements-dev.txt
+Hardware/MQTT/
+Hardware/MQTT_OFFLINE/
+Hardware/Esp32_MQTT/
+Hardware/*.pdf
+Agents/solarsage_output/
+Agents/requirements.txt
+Backend/data/solar_panel_system.db
+Backend/data/decisions/

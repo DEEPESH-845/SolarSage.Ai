@@ -1,0 +1,4 @@
+-r requirements.txt
+
+# Test-only: starlette/fastapi TestClient needs httpx.
+httpx==0.28.1
