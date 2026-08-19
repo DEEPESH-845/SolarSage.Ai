@@ -8,7 +8,7 @@ and external clients.
 
 import json
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -75,10 +75,19 @@ def _clock(value):
 
 
 def _iso_or_none(value):
+    """Normalise a timestamp to naive UTC.
+
+    Every timestamp in the database is naive UTC (see models.utcnow), and this one
+    is compared against them to decide how much water is left. An offset-carrying
+    value used to be stored verbatim, so a refill recorded in +05:30 compared as a
+    time 5.5 hours later than it was and hid real usage from the tank guard.
+    """
     if value in (None, ""):
         return None
-    datetime.fromisoformat(str(value))  # raises on anything else
-    return str(value)
+    parsed = datetime.fromisoformat(str(value))  # raises on anything else
+    if parsed.tzinfo is not None:
+        parsed = parsed.astimezone(timezone.utc).replace(tzinfo=None)
+    return parsed.isoformat()
 
 
 # Every writable setting declares what it accepts, because these values leave
@@ -315,6 +324,9 @@ def system_stats(db: Session) -> dict:
 
 
 def system_logs(db: Session, limit: int = 50) -> list:
+    # The API takes this from a query string, so it is bounded here rather than
+    # trusting a caller to ask for a sane number of rows.
+    limit = max(1, min(int(limit), 500))
     rows = db.query(SystemLog).order_by(SystemLog.timestamp.desc()).limit(limit).all()
     return [row.to_dict() for row in rows]
 

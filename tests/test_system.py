@@ -10,6 +10,7 @@ import os
 import sqlite3
 import sys
 import tempfile
+from datetime import datetime
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -51,6 +52,83 @@ def test_classifier_reads_the_image_fixtures():
 
     missing = agent.classify_dust_level(settings.image_dir / "does_not_exist.jpg")
     assert "error" in missing, missing
+
+
+def test_the_same_frame_always_reads_the_same():
+    """The classifier used to add Gaussian noise to its own measurement, so one
+    image produced a different dust level on every run and the cleaning
+    thresholds were being applied to that noise."""
+    from Backend.agents.image_classifier import ImageClassifierAgent
+
+    agent = ImageClassifierAgent()
+    image = settings.image_dir / "panel_01_test.jpg"
+    readings = [agent.classify_dust_level(image) for _ in range(4)]
+
+    assert len({r["dust_level"] for r in readings}) == 1, [r["dust_level"] for r in readings]
+    assert len({r["confidence"] for r in readings}) == 1
+    assert len({r["daily_power_loss_kwh"] for r in readings}) == 1, "forecast must be reproducible too"
+    assert len({tuple(r["insights"]) for r in readings}) == 1
+
+
+def test_a_failed_analysis_reports_an_error_instead_of_inventing_one():
+    """A fabricated dust level reaches the decision engine and opens a valve."""
+    import numpy as np
+
+    from Agents.crew import ProductionImageProcessor, standalone_analyze_image
+
+    unreadable = Path(TMP_DIR) / "not_an_image.jpg"
+    unreadable.write_text("plainly not a jpeg")
+    assert "error" in standalone_analyze_image(str(unreadable))
+
+    # An array the CV stage cannot handle must raise, not fall back to a guess.
+    try:
+        ProductionImageProcessor.process_image(np.zeros((8, 8), dtype=np.uint8))
+        raise AssertionError("a broken frame produced a result")
+    except Exception as e:
+        assert "failed" in str(e).lower(), e
+
+
+def test_decision_engine_survives_a_forecast_that_produced_nothing():
+    """payback_days was only bound when there was a loss to pay back."""
+    from Agents.crew import standalone_decision_engine
+
+    result = standalone_decision_engine({"dust_level": 40, "confidence": 80}, {})
+    assert "error" not in result, result
+    assert result["cost_benefit_analysis"]["payback_period_days"] == 999
+
+
+def test_a_refill_recorded_with_an_offset_still_counts_water():
+    """An offset-carrying timestamp used to compare as a later moment than it was,
+    hiding real usage from the tank guard."""
+    from datetime import timedelta, timezone as tz
+
+    db = SessionLocal()
+    try:
+        services.reset_settings(db)
+        ist = tz(timedelta(hours=5, minutes=30))
+        refilled = datetime.now(tz.utc) - timedelta(hours=1)
+        services.update_settings(db, {"tank_refilled_at": refilled.astimezone(ist).isoformat()})
+
+        stored = services.get_settings(db)["tank_refilled_at"]
+        assert "+" not in stored, f"stored with an offset: {stored}"
+
+        before = services.water_status(db)["used_ml"]
+        services.spray_panel(db, "panel_01")
+        after = services.water_status(db)["used_ml"]
+        assert after > before, "a spray after the refill was not counted"
+    finally:
+        services.reset_settings(db)
+        services.refill_tank(db)
+        db.close()
+
+
+def test_log_limit_is_bounded():
+    db = SessionLocal()
+    try:
+        assert len(services.system_logs(db, limit=10**9)) <= 500
+        assert len(services.system_logs(db, limit=0)) <= 1
+    finally:
+        db.close()
 
 
 def test_analyze_records_status_decision_and_log():

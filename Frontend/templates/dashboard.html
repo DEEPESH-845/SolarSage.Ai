@@ -165,9 +165,11 @@
         </span>
       </header>
 
-      <p class="numeral panelcard__dust" data-live="panel-dust">
-        {% if panel.dust_level is not none %}{{ (panel.dust_level * 100)|round(1) }}<span class="panelcard__unit">% dust</span>
-        {% else %}—<span class="panelcard__unit">not analysed</span>{% endif %}
+      {# The live updater writes into these two nodes, and the panels table uses the
+         same "panel-dust" contract — so the number node never carries markup. #}
+      <p class="numeral panelcard__dust">
+        <span data-live="panel-dust">{% if panel.dust_level is not none %}{{ (panel.dust_level * 100)|round(1) }}%{% else %}—{% endif %}</span>
+        <span class="panelcard__unit" data-live="panel-dust-unit">{{ 'dust' if panel.dust_level is not none else 'not analysed' }}</span>
       </p>
 
       <div class="meter panelcard__meter" data-live="panel-meter"

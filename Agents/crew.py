@@ -8,35 +8,26 @@ import cv2
 import numpy as np
 import base64
 import uuid
-import fcntl  # For file locking on Unix systems
-import os
-import shutil
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Union, Any, Annotated
-from pathlib import Path
 import logging
 from enum import Enum
-from contextlib import contextmanager
-import threading
 import time
 
 # Pydantic V2 compatible imports
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator
 
 # CrewAI for agent orchestration (with fallback)
+logger = logging.getLogger(__name__)
+
 try:
     from crewai import Agent, Task, Crew, Process
     from crewai import tool
     CREWAI_AVAILABLE = True
-    print("✅ CrewAI loaded successfully")
+    logger.info("CrewAI loaded — agent orchestration available")
 except ImportError:
     CREWAI_AVAILABLE = False
-    print("⚠️ CrewAI not available. Running in standalone mode.")
-    print("📦 To install CrewAI: pip install crewai")
-
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+    logger.info("CrewAI not installed — running the standalone pipeline")
 
 # ============================================================================
 # PYDANTIC V2 COMPATIBLE SCHEMAS
@@ -272,8 +263,10 @@ class ProductionImageProcessor:
                 edge_factor * 0.20
             ) * 100
             
-            # Apply realistic constraints
-            dust_level = max(5, min(95, dust_level + np.random.normal(0, 2)))
+            # Clamp to the reportable range. Nothing random belongs here: the same
+            # frame has to produce the same reading, or the thresholds that decide
+            # whether to open a valve are being applied to noise.
+            dust_level = max(0.0, min(100.0, dust_level))
             
             # Calculate confidence based on image quality metrics
             std_brightness = np.std(gray)
@@ -305,14 +298,11 @@ class ProductionImageProcessor:
             }
             
         except Exception as e:
+            # A made-up dust level is worse than no dust level: it reaches the
+            # decision engine, which opens a valve on the strength of it. Fail
+            # instead — callers already turn this into an error result.
             logger.error(f"Computer vision analysis failed: {str(e)}")
-            # Fallback to basic analysis
-            return {
-                'dust_level': np.random.uniform(25, 75),
-                'confidence': np.random.uniform(70, 85),
-                'visual_score': np.random.uniform(60, 85),
-                'image_quality': "MEDIUM"
-            }
+            raise
     
     @staticmethod
     def _generate_insights(analysis_results: Dict[str, float]) -> List[str]:
@@ -511,6 +501,10 @@ if CREWAI_AVAILABLE:
 # HELPER FUNCTIONS
 # ============================================================================
 
+# Fraction of clear-sky generation assumed while no weather feed is connected.
+CLEAR_SKY_FACTOR = 0.90
+
+
 def calculate_advanced_forecast(dust_level: float, location: str, confidence: float) -> Dict:
     """Advanced solar forecasting with realistic modeling"""
     
@@ -528,8 +522,10 @@ def calculate_advanced_forecast(dust_level: float, location: str, confidence: fl
     daily_power_loss = base_generation * dust_impact * 0.45
     power_loss_percentage = (daily_power_loss / base_generation) * 100
     
-    # Weather simulation
-    weather_factor = np.random.uniform(0.85, 0.95)
+    # Placeholder for a weather source. It was a random draw per call, which made
+    # the same panel forecast differently every time it was analysed; a fixed
+    # clear-sky derate keeps the forecast reproducible until real weather is wired in.
+    weather_factor = CLEAR_SKY_FACTOR
     
     # 48-hour realistic solar generation forecast
     forecast_48h = []
@@ -572,8 +568,8 @@ def calculate_advanced_forecast(dust_level: float, location: str, confidence: fl
     
     # AI analysis
     llama_analysis = f"""Advanced forecast analysis for {location}: Dust level {dust_level:.1f}% 
-    causing {daily_power_loss:.1f} kWh daily losses (${daily_loss_usd:.2f}). Weather conditions 
-    {weather_factor*100:.0f}% favorable. Confidence: {confidence:.1f}%. Action window: 
+    causing {daily_power_loss:.1f} kWh daily losses (${daily_loss_usd:.2f}). Assumed clear-sky 
+    factor {weather_factor*100:.0f}% (no weather feed connected). Confidence: {confidence:.1f}%. Action window: 
     {cleaning_window.value}. Economic viability: Strong ROI potential."""
     
     return {
@@ -591,7 +587,6 @@ def calculate_intelligent_decision(image_data: Dict, forecast_data: Dict) -> Dic
     
     dust_level = image_data.get('dust_level', 0)
     confidence = image_data.get('confidence', 0)
-    daily_loss_kwh = forecast_data.get('daily_power_loss_kwh', 0)
     economic_factors = forecast_data.get('economic_factors', {})
     
     # Environmental risk calculation
@@ -602,6 +597,10 @@ def calculate_intelligent_decision(image_data: Dict, forecast_data: Dict) -> Dic
     daily_loss_usd = economic_factors.get('daily_loss_usd', 0)
     cleaning_cost = economic_factors.get('cleaning_cost_usd', 24.50)
     
+    # Bound before the branch: the risk-factor check below reads it either way, and
+    # an upstream failure that leaves economic_factors empty used to raise here.
+    payback_days = float("inf")
+
     if daily_loss_usd > 0:
         payback_days = cleaning_cost / daily_loss_usd
         if payback_days < 5:
@@ -703,7 +702,17 @@ def calculate_intelligent_decision(image_data: Dict, forecast_data: Dict) -> Dic
     }
 
 def execute_cleaning_operation(decision_data: Dict) -> Dict:
-    """Advanced execution simulation with realistic automation"""
+    """SIMULATION ONLY — do not surface these numbers as readings.
+
+    Water used, power recovered, success rate, pump efficiency and the
+    "environmental conditions" below are all drawn at random to make the demo
+    pipeline print something plausible. Nothing here touches hardware.
+
+    The web app deliberately does not call this: it runs the real spray path in
+    Backend/services.spray_panel and reads real sensor values from
+    Backend/services.latest_telemetry. Wire this into a UI and it will present
+    invented data as measurements.
+    """
     
     decision_type = decision_data.get('cleaning_priority', 'CONTINUE_MONITORING')
     

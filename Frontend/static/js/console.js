@@ -87,7 +87,11 @@
 
       document.querySelectorAll('[data-live="count"]').forEach(function (node) {
         var key = node.getAttribute('data-count-key');
-        if (live.counts && live.counts[key] != null) node.textContent = live.counts[key];
+        if (!live.counts || live.counts[key] == null) return;
+        node.textContent = live.counts[key];
+        // Some of these also animate on first scroll-in. Move the target too, or a
+        // tween that fires later would count up to the value the page loaded with.
+        if (node.hasAttribute('data-count')) node.setAttribute('data-count', live.counts[key]);
       });
 
       updateDecision(live.latest_decision);
@@ -103,11 +107,12 @@
 
         var dust = card.querySelector('[data-live="panel-dust"]');
         if (dust) {
-          dust.innerHTML =
-            panel.dust_level == null
-              ? '—<span class="panelcard__unit">not analysed</span>'
-              : (panel.dust_level * 100).toFixed(1) + '<span class="panelcard__unit">% dust</span>';
+          dust.textContent = panel.dust_level == null ? '—' : (panel.dust_level * 100).toFixed(1) + '%';
         }
+
+        // Only the dashboard card has a unit beside the number; the table does not.
+        var unit = card.querySelector('[data-live="panel-dust-unit"]');
+        if (unit) unit.textContent = panel.dust_level == null ? 'not analysed' : 'dust';
 
         var meter = card.querySelector('[data-live="panel-meter"]');
         if (meter) {
