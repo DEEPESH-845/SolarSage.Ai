@@ -49,6 +49,65 @@ DEFAULT_SETTINGS = {
 }
 
 
+def _bounded_int(low: int, high: int):
+    def coerce(value):
+        return max(low, min(high, int(float(value))))
+    return coerce
+
+
+def _one_of(*allowed):
+    def coerce(value):
+        if value not in allowed:
+            raise ValueError(f"expected one of: {', '.join(map(str, allowed))}")
+        return value
+    return coerce
+
+
+def _boolean(value):
+    if isinstance(value, str):
+        return value.strip().lower() in ("1", "true", "yes", "on")
+    return bool(value)
+
+
+def _clock(value):
+    datetime.strptime(str(value), "%H:%M")  # raises on anything else
+    return str(value)
+
+
+def _iso_or_none(value):
+    if value in (None, ""):
+        return None
+    datetime.fromisoformat(str(value))  # raises on anything else
+    return str(value)
+
+
+# Every writable setting declares what it accepts, because these values leave
+# the database and act: refresh_interval becomes a browser timer, spray_duration
+# becomes pump seconds. Values that fail are rejected rather than stored.
+SETTING_VALIDATORS = {
+    "dust_threshold": _bounded_int(0, 100),
+    "schedule_threshold": _bounded_int(0, 100),
+    "spray_duration": _bounded_int(0, 3600),  # the tank is the real limit
+    "refresh_interval": _bounded_int(5, 3600),
+    "water_pressure": _one_of("low", "medium", "high"),
+    "cleaning_frequency": _one_of("daily", "weekly", "biweekly", "monthly"),
+    "system_mode": _one_of("active", "paused"),
+    "auto_clean": _boolean,
+    "notifications": _boolean,
+    "alert_email": lambda value: str(value).strip()[:254],
+    "preferred_time": _clock,
+    "tank_refilled_at": _iso_or_none,
+}
+
+
+def unknown_panel(panel_id: str) -> Optional[dict]:
+    """Panel ids reach the filesystem (image fixtures) and the database, so every
+    entry point that takes one validates it here rather than trusting its caller."""
+    if panel_id not in settings.panel_ids:
+        return {"error": f"Unknown panel: {panel_id}", "panel_id": panel_id}
+    return None
+
+
 # --------------------------------------------------------------------------
 # logging
 # --------------------------------------------------------------------------
@@ -73,15 +132,26 @@ def log_event(db: Session, level: str, component: str, message: str, details: Op
 # --------------------------------------------------------------------------
 
 def get_settings(db: Session) -> dict:
-    stored = {row.key: json.loads(row.value) for row in db.query(SystemSetting).all()}
+    stored = {}
+    for row in db.query(SystemSetting).all():
+        try:
+            stored[row.key] = json.loads(row.value)
+        except (TypeError, ValueError):
+            continue  # a corrupt row falls back to its default rather than 500ing
     return {**DEFAULT_SETTINGS, **stored}
 
 
 def update_settings(db: Session, values: dict) -> dict:
     """Persist only known keys; unknown keys are ignored rather than stored."""
-    applied = {}
+    applied, rejected = {}, {}
     for key, value in values.items():
-        if key not in DEFAULT_SETTINGS:
+        validator = SETTING_VALIDATORS.get(key)
+        if validator is None:
+            continue
+        try:
+            value = validator(value)
+        except (TypeError, ValueError) as e:
+            rejected[key] = str(e)
             continue
         row = db.get(SystemSetting, key)
         if row:
@@ -91,6 +161,8 @@ def update_settings(db: Session, values: dict) -> dict:
         applied[key] = value
 
     log_event(db, "INFO", "settings", f"Updated {len(applied)} setting(s)", applied)
+    if rejected:
+        log_event(db, "WARNING", "settings", f"Rejected {len(rejected)} invalid setting(s)", rejected)
     db.commit()
     return get_settings(db)
 
@@ -161,7 +233,13 @@ def latest_telemetry() -> dict:
         if panel and row.get("timestamp", "") >= latest.get(panel, {}).get("timestamp", ""):
             latest[panel] = row
 
-    rows = list(latest.values())
+    # Node order, not file order: PANNEL_10 must not sort before PANNEL_2, and both
+    # the console table and the panel lookup read this list positionally.
+    def node_index(row):
+        digits = "".join(c for c in str(row.get("panel_id", "")) if c.isdigit())
+        return int(digits) if digits else 0
+
+    rows = sorted(latest.values(), key=node_index)
     numeric = lambda key: [r[key] for r in rows if isinstance(r.get(key), (int, float))]
     temps, humidity, efficiency = numeric("temperature"), numeric("humidity"), numeric("efficiency")
     return {
@@ -251,6 +329,10 @@ def _panel_image(panel_id: str) -> Path:
 
 def analyze_panel(db: Session, panel_id: str) -> dict:
     """Run the CV + forecasting pipeline for one panel and record the decision."""
+    invalid = unknown_panel(panel_id)
+    if invalid:
+        return invalid
+
     config = get_settings(db)
     image_path = _panel_image(panel_id)
 
@@ -361,6 +443,10 @@ def latest_decision(db: Session) -> dict:
 
 
 def spray_panel(db: Session, panel_id: str) -> dict:
+    invalid = unknown_panel(panel_id)
+    if invalid:
+        return invalid
+
     config = get_settings(db)
 
     if config["system_mode"] == "paused":
@@ -450,6 +536,10 @@ def list_panels(db: Session) -> dict:
 
 
 def panel_history(db: Session, panel_id: str, limit: int = 10) -> dict:
+    invalid = unknown_panel(panel_id)
+    if invalid:
+        return invalid
+
     status_history = (
         db.query(PanelStatus)
         .filter(PanelStatus.panel_id == panel_id)
