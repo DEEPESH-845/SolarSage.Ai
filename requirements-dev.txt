@@ -2,3 +2,7 @@
 
 # Test-only: starlette/fastapi TestClient needs httpx.
 httpx==0.28.1
+
+# Browser checks for the frontend (screenshots, interaction runs).
+# After installing: python -m playwright install chromium
+playwright==1.62.0

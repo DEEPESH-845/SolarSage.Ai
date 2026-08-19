@@ -151,7 +151,8 @@ SolarSage employs 4 specialized AI agents that collaborate to optimize solar pan
 │   └── database/              # SQLAlchemy models + session handling
 ├── Frontend/
 │   ├── app.py                 # Flask UI, calls services in-process
-│   └── templates/             # Dashboard, panels, reports, settings
+│   ├── templates/             # Landing page + console (dashboard, panels, reports, settings)
+│   └── static/                # Design system CSS, page scripts, self-hosted fonts, vendored GSAP/Motion
 ├── Agents/crew.py             # CV → forecast → decision → execution pipeline
 ├── Hardware/                  # ESP32 firmware, MQTT tooling, captured telemetry
 └── tests/test_system.py       # End-to-end checks against a temp database
@@ -169,6 +170,40 @@ Analysis flows: `Frontend` → `services.analyze_panel` →
 
 ---
 
+## 🖥️ The interface
+
+Two surfaces, one design system:
+
+* **`/`** — a landing page whose numbers are read from the live system, not
+  written into the copy. The hero canvas draws the four modules at their real
+  measured dust coverage and runs a wash pass across them.
+* **`/dashboard`, `/panels`, `/system-reports`, `/settings`** — the operator
+  console. Every action reports through a toast and refreshes the affected
+  values in place instead of reloading the page.
+
+Colour carries meaning throughout: gold is sunlight, ochre is soiling, teal is
+water, vermilion is a fault.
+
+**No build step.** Templates are Jinja, styles are hand-written CSS, and the
+animation runtimes ([GSAP + ScrollTrigger](https://gsap.com) for scroll
+choreography, [Motion](https://motion.dev) — Framer Motion's vanilla build — for
+spring-based pointer interactions) are vendored under `Frontend/static/vendor/`
+alongside self-hosted fonts. The page makes no third-party requests, which is
+what lets the Content-Security-Policy stay at `script-src 'self'`.
+
+Everything degrades: without JavaScript the pages render and read normally, and
+`prefers-reduced-motion` disables the choreography rather than the content.
+
+### Request shapes
+
+| Shape | Examples | Notes |
+|---|---|---|
+| Pages | `/`, `/dashboard`, `/panels`, `/system-reports`, `/settings` | Server-rendered HTML |
+| Actions | `POST /analyze/<panel_id>`, `POST /spray/<panel_id>` | POST-only — they write rows and open a valve. Answer JSON to `fetch`, redirect back to a form post |
+| JSON | `/api/live`, `/api/panel/<id>`, `/api/settings`, … | Used by the page scripts |
+
+---
+
 ## 🚀 Quick Start
 
 ```bash
@@ -180,7 +215,8 @@ python run_system.py           # backend :8000 + frontend :5000
 
 | Service | URL |
 |---|---|
-| Dashboard | http://localhost:5000 |
+| Landing page | http://localhost:5000 |
+| Console (dashboard) | http://localhost:5000/dashboard |
 | REST API | http://localhost:8000 |
 | API docs | http://localhost:8000/docs |
 
@@ -208,13 +244,33 @@ settings are edited on the Settings page and stored in the database.
 | `SQLITE_DATABASE_PATH` | `<DATA_DIR>/solar_panel_system.db` | Explicit database path |
 | `FRONTEND_PORT` / `API_PORT` | `5000` / `8000` | Server ports |
 | `BACKEND_URL` | unset | Set it to call a remote FastAPI backend over HTTP instead of in-process |
-| `SECRET_KEY` | dev fallback | Flask session signing — set this in production |
+| `SECRET_KEY` | random per process | Flask session signing — set this in production, or flash messages reset on restart |
+| `FLASK_DEBUG` | unset | `1` enables the Werkzeug debugger and binds to localhost only. Never set it on a shared host |
 | `CORS_ORIGINS` | `http://localhost:5000` | Comma-separated origins allowed to call the API |
 | `WATER_TANK_CAPACITY_ML` | `5000` | Tank size used for water-level reporting |
 
 Runtime settings (dust thresholds, spray duration, water pressure, auto-clean,
 notifications, schedule, paused/active mode) live in the `system_settings`
 table and are editable from the UI.
+
+---
+
+## 🔒 Security posture
+
+The app has no authentication, so it is meant for a trusted network, not the
+open internet. Within that, the parts that can act are guarded:
+
+* Panel ids are validated in `Backend/services.py` before they reach the
+  filesystem or the database — every entry point routes through that one check.
+* Anything that writes is POST-only, and a write carrying another site's
+  `Origin` is refused, so a page elsewhere cannot trigger a spray.
+* Settings are range- and type-checked on the way in: a refresh interval
+  becomes a browser timer and a spray duration becomes pump seconds, so neither
+  is stored unvalidated.
+* Responses carry a strict CSP (`script-src 'self'`), `nosniff`, `DENY` framing
+  and a same-origin referrer policy. `SECRET_KEY` has no fixed fallback.
+* Redirect-back after an action keeps only the path of the referrer, so it
+  cannot be pointed off-site.
 
 ---
 
