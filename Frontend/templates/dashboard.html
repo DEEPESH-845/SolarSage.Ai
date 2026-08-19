@@ -44,7 +44,7 @@
 
       <div class="tankrow__facts">
         <p class="label">Water tank</p>
-        <p class="numeral tankrow__value" data-count="{{ health.water_level }}" data-decimals="1" data-suffix="%">
+        <p class="numeral numeral--lg tankrow__value" data-count="{{ health.water_level }}" data-decimals="1" data-suffix="%">
           {{ health.water_level }}%
         </p>
         <p class="mono text-faint" data-live="water-text">
@@ -89,13 +89,13 @@
     <div class="decision__grid">
       <div><p class="label">Panel</p><p class="mono decision__value" data-live="decision-panel">{{ decision.panel_id }}</p></div>
       <div><p class="label">Dust coverage</p>
-        <p class="numeral decision__value text-dust" data-live="decision-dust"
+        <p class="numeral numeral--sm decision__value text-dust" data-live="decision-dust"
            data-count="{{ (decision.dust_level * 100)|round(1) }}" data-decimals="1" data-suffix="%">
           {{ (decision.dust_level * 100)|round(1) }}%</p></div>
       <div><p class="label">Confidence</p>
-        <p class="numeral decision__value" data-count="{{ (decision.confidence * 100)|round(1) }}" data-decimals="1" data-suffix="%">
+        <p class="numeral numeral--sm decision__value" data-count="{{ (decision.confidence * 100)|round(1) }}" data-decimals="1" data-suffix="%">
           {{ (decision.confidence * 100)|round(1) }}%</p></div>
-      <div><p class="label">Water planned</p><p class="numeral decision__value">{{ decision.water_volume }}<span class="decision__unit">ml</span></p></div>
+      <div><p class="label">Water planned</p><p class="numeral numeral--sm decision__value">{{ decision.water_volume }}<span class="decision__unit">ml</span></p></div>
     </div>
 
     {% if analysis %}
@@ -157,7 +157,7 @@
   {% if rows %}
   <div class="grid grid--4 panelgrid" data-stagger="0.06">
     {% for panel in rows %}
-    <article class="panelcard" data-panel-card="{{ panel.id }}" data-tilt="6">
+    <article class="card card--tight panelcard" data-panel-card="{{ panel.id }}" data-tilt="6">
       <header class="row row--between">
         <h3 class="panelcard__id mono">{{ panel.id|replace('_', ' ')|title }}</h3>
         <span class="pill pill--{{ panel.status if panel.status != 'moderate_dust' else 'moderate' }}" data-live="panel-status">
@@ -167,7 +167,7 @@
 
       {# The live updater writes into these two nodes, and the panels table uses the
          same "panel-dust" contract — so the number node never carries markup. #}
-      <p class="numeral panelcard__dust">
+      <p class="numeral numeral--md panelcard__dust">
         <span data-live="panel-dust">{% if panel.dust_level is not none %}{{ (panel.dust_level * 100)|round(1) }}%{% else %}—{% endif %}</span>
         <span class="panelcard__unit" data-live="panel-dust-unit">{{ 'dust' if panel.dust_level is not none else 'not analysed' }}</span>
       </p>

@@ -16,27 +16,27 @@
 {% block page %}
 
 <section class="grid grid--4 statgrid" data-stagger="0.06">
-  <article class="statcard">
+  <article class="card card--tight statcard">
     <p class="label">Under watch</p>
-    <p class="numeral statcard__value" data-live="count" data-count-key="total"
+    <p class="numeral numeral--lg statcard__value" data-live="count" data-count-key="total"
        data-count="{{ counts.total }}">{{ counts.total }}</p>
     <p class="statcard__note">Panels configured in the system</p>
   </article>
-  <article class="statcard">
+  <article class="card card--tight statcard">
     <p class="label">Clean</p>
-    <p class="numeral statcard__value text-water" data-live="count" data-count-key="clean"
+    <p class="numeral numeral--lg statcard__value text-water" data-live="count" data-count-key="clean"
        data-count="{{ counts.clean }}">{{ counts.clean }}</p>
     <p class="statcard__note">Below the schedule threshold ({{ config.schedule_threshold }}%)</p>
   </article>
-  <article class="statcard">
+  <article class="card card--tight statcard">
     <p class="label">Moderate dust</p>
-    <p class="numeral statcard__value text-dust" data-live="count" data-count-key="moderate_dust"
+    <p class="numeral numeral--lg statcard__value text-dust" data-live="count" data-count-key="moderate_dust"
        data-count="{{ counts.moderate_dust }}">{{ counts.moderate_dust }}</p>
     <p class="statcard__note">Scheduled, not sprayed yet</p>
   </article>
-  <article class="statcard">
+  <article class="card card--tight statcard">
     <p class="label">Needs washing</p>
-    <p class="numeral statcard__value text-alarm" data-live="count" data-count-key="needs_cleaning"
+    <p class="numeral numeral--lg statcard__value text-alarm" data-live="count" data-count-key="needs_cleaning"
        data-count="{{ counts.needs_cleaning }}">{{ counts.needs_cleaning }}</p>
     <p class="statcard__note">Past the immediate threshold ({{ config.dust_threshold }}%)</p>
   </article>

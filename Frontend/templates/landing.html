@@ -80,7 +80,7 @@
       </div>
       <div class="readout">
         <dt class="label">Water tank</dt>
-        <dd class="numeral readout__value"
+        <dd class="numeral numeral--sm readout__value"
             data-count="{{ health.water_level if health else 0 }}" data-decimals="1" data-suffix="%">
           {{ health.water_level if health else 0 }}%
         </dd>
@@ -91,7 +91,7 @@
       </div>
       <div class="readout">
         <dt class="label">Needs attention</dt>
-        <dd class="numeral readout__value {{ 'text-dust' if counts.attention else 'text-water' }}"
+        <dd class="numeral numeral--sm readout__value {{ 'text-dust' if counts.attention else 'text-water' }}"
             data-count="{{ counts.attention }}">{{ counts.attention }}</dd>
       </div>
     </dl>
@@ -152,22 +152,22 @@
 
     {% if analysis.get('daily_power_loss_kwh') is not none %}
     <div class="grid grid--3 cost__stats" data-stagger="0.09">
-      <div class="stat panel" data-tilt="4">
+      <div class="card stat" data-tilt="4">
         <p class="label">Lost each day</p>
-        <p class="numeral stat__value" data-count="{{ analysis.daily_power_loss_kwh }}"
+        <p class="numeral numeral--lg stat__value" data-count="{{ analysis.daily_power_loss_kwh }}"
            data-decimals="2" data-suffix=" kWh">{{ analysis.daily_power_loss_kwh }} kWh</p>
         <p class="stat__note">Measured on {{ latest_decision.panel_id }} at
           {{ (latest_decision.dust_level * 100)|round(1) }}% dust coverage.</p>
       </div>
-      <div class="stat panel" data-tilt="4">
+      <div class="card stat" data-tilt="4">
         <p class="label">Output held back</p>
-        <p class="numeral stat__value text-dust" data-count="{{ analysis.power_loss_percentage }}"
+        <p class="numeral numeral--lg stat__value text-dust" data-count="{{ analysis.power_loss_percentage }}"
            data-decimals="1" data-suffix="%">{{ analysis.power_loss_percentage }}%</p>
         <p class="stat__note">Soiling loss the forecaster derived from that coverage.</p>
       </div>
-      <div class="stat panel" data-tilt="4">
+      <div class="card stat" data-tilt="4">
         <p class="label">Recovered per week</p>
-        <p class="numeral stat__value text-water" data-count="{{ analysis.estimated_savings_weekly }}"
+        <p class="numeral numeral--lg stat__value text-water" data-count="{{ analysis.estimated_savings_weekly }}"
            data-decimals="2" data-prefix="$">${{ analysis.estimated_savings_weekly }}</p>
         <p class="stat__note">
           {% if analysis.cleaning_cost_usd is not none %}Net of the ${{ analysis.cleaning_cost_usd }} a wash costs,
@@ -176,7 +176,7 @@
       </div>
     </div>
     {% else %}
-    <div class="panel cost__pending" data-reveal>
+    <div class="card cost__pending" data-reveal>
       <p class="label">No priced analysis on record</p>
       <p class="lede" style="margin: 0.75rem 0 1.5rem">
         The numbers here come from a real classifier run — nothing is filled in until one has happened.
@@ -203,7 +203,7 @@
 
   <div class="loop" id="loop-track">
     <div class="loop__rail">
-      <article class="stage">
+      <article class="card stage">
         <p class="stage__index mono">01</p>
         <h3 class="display stage__title">Capture</h3>
         <p class="stage__body">
@@ -213,7 +213,7 @@
         <p class="stage__meta mono">{{ icon('camera', 14) }} {{ panels.total_panels if panels else 0 }} cameras · {{ (health.camera_status if health else 'offline')|title }}</p>
       </article>
 
-      <article class="stage">
+      <article class="card stage">
         <p class="stage__index mono">02</p>
         <h3 class="display stage__title">Classify</h3>
         <p class="stage__body">
@@ -223,7 +223,7 @@
         <p class="stage__meta mono">{{ icon('scan', 14) }} coverage + confidence, ~{{ analysis.get('processing_time_ms', '—') }} ms</p>
       </article>
 
-      <article class="stage">
+      <article class="card stage">
         <p class="stage__index mono">03</p>
         <h3 class="display stage__title">Price</h3>
         <p class="stage__body">
@@ -233,7 +233,7 @@
         <p class="stage__meta mono">{{ icon('money', 14) }} last run: pays back in {{ analysis.get('payback_period_days', '—') }} days</p>
       </article>
 
-      <article class="stage stage--act">
+      <article class="card stage stage--act">
         <p class="stage__index mono">04</p>
         <h3 class="display stage__title">Act</h3>
         <p class="stage__body">
@@ -268,7 +268,7 @@
     {% if readings %}
     <div class="grid grid--4 field__grid" data-stagger="0.08">
       {% for reading in mapped %}
-      <article class="reading panel" data-tilt="7">
+      <article class="card card--tight reading" data-tilt="7">
         <header class="row row--between">
           <p class="label">{{ reading.panel_id|replace('PANNEL_', 'Panel ') }}</p>
           <span class="mono text-faint">{{ reading.efficiency }}%</span>
@@ -280,7 +280,7 @@
             <circle class="reading__arc" cx="50" cy="50" r="42"
                     style="stroke-dashoffset: {{ (264 * (1 - (reading.efficiency|float / 100)))|round(1) }}"/>
           </svg>
-          <p class="numeral reading__value">{{ reading.efficiency|round|int }}<span class="reading__unit">%</span></p>
+          <p class="numeral numeral--sm reading__value">{{ reading.efficiency|round|int }}<span class="reading__unit">%</span></p>
           <p class="label reading__caption">Efficiency</p>
         </div>
 
@@ -331,10 +331,10 @@
       </div>
       <div class="preview__body">
         <div class="preview__stats">
-          <div><p class="label">Clean</p><p class="numeral text-water">{{ counts.clean }}</p></div>
-          <div><p class="label">Dusty</p><p class="numeral text-dust">{{ counts.moderate_dust }}</p></div>
-          <div><p class="label">Wash now</p><p class="numeral text-alarm">{{ counts.needs_cleaning }}</p></div>
-          <div><p class="label">Untested</p><p class="numeral text-faint">{{ counts.unknown }}</p></div>
+          <div><p class="label">Clean</p><p class="numeral numeral--sm text-water">{{ counts.clean }}</p></div>
+          <div><p class="label">Dusty</p><p class="numeral numeral--sm text-dust">{{ counts.moderate_dust }}</p></div>
+          <div><p class="label">Wash now</p><p class="numeral numeral--sm text-alarm">{{ counts.needs_cleaning }}</p></div>
+          <div><p class="label">Untested</p><p class="numeral numeral--sm text-faint">{{ counts.unknown }}</p></div>
         </div>
         <ul class="preview__rows">
           {% for panel in rows %}
@@ -370,19 +370,19 @@
     <p class="eyebrow" data-reveal>The ledger so far</p>
     <div class="ledger" data-stagger="0.08">
       <div class="ledger__item">
-        <p class="numeral ledger__value" data-count="{{ stats.total_analyses if stats else 0 }}">0</p>
+        <p class="numeral numeral--xl ledger__value" data-count="{{ stats.total_analyses if stats else 0 }}">0</p>
         <p class="label">Panels analysed</p>
       </div>
       <div class="ledger__item">
-        <p class="numeral ledger__value" data-count="{{ stats.total_cleanings if stats else 0 }}">0</p>
+        <p class="numeral numeral--xl ledger__value" data-count="{{ stats.total_cleanings if stats else 0 }}">0</p>
         <p class="label">Wash cycles run</p>
       </div>
       <div class="ledger__item">
-        <p class="numeral ledger__value" data-count="{{ stats.water_used_total if stats else 0 }}" data-decimals="0" data-suffix=" ml">0</p>
+        <p class="numeral numeral--xl ledger__value" data-count="{{ stats.water_used_total if stats else 0 }}" data-decimals="0" data-suffix=" ml">0</p>
         <p class="label">Water spent</p>
       </div>
       <div class="ledger__item">
-        <p class="numeral ledger__value" data-count="{{ ((stats.avg_dust_level if stats else 0) * 100)|round(1) }}" data-decimals="1" data-suffix="%">0</p>
+        <p class="numeral numeral--xl ledger__value" data-count="{{ ((stats.avg_dust_level if stats else 0) * 100)|round(1) }}" data-decimals="1" data-suffix="%">0</p>
         <p class="label">Mean dust coverage</p>
       </div>
     </div>
