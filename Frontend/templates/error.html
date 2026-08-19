@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+
+{% block title %}{{ code }} — SolarSage{% endblock %}
+
+{% block styles %}
+  <link rel="stylesheet" href="{{ asset_url('css/console.css') }}">
+{% endblock %}
+
+{% block content %}
+<section class="shell" style="min-height: 80vh; display: grid; place-content: center; text-align: center; gap: 1.25rem; padding: 4rem 0">
+  <p class="numeral" style="font-size: clamp(4rem, 16vw, 9rem); color: var(--wafer-500)">{{ code }}</p>
+  <h1 class="display" style="font-size: clamp(1.6rem, 4vw, 2.4rem)">{{ title }}</h1>
+  <p class="lede" style="margin-inline: auto">{{ detail }}</p>
+  <div class="row" style="justify-content: center; margin-top: 1rem">
+    <a class="btn btn--sun" href="{{ url_for('dashboard') }}">{{ icon('gauge', 14) }} Back to the console</a>
+    <a class="btn" href="{{ url_for('landing') }}">Home</a>
+  </div>
+</section>
+{% endblock %}

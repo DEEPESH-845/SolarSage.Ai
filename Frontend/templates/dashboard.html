@@ -1,297 +1,221 @@
-{% extends "base.html" %}
+{% extends "console.html" %}
+{% from "_icons.html" import icon %}
 
-{% block title %}Dashboard - Solar Panel Cleaning System{% endblock %}
+{% set decision = latest_decision or {} %}
+{% set analysis = decision.get('analysis') or {} %}
+{% set rows = (panels or {}).get('panels', []) %}
 
-{% block content %}
-<div class="row">
-    <!-- System Health Card -->
-    <div class="col-lg-4 mb-4">
-        <div class="card h-100">
-            <div class="card-body">
-                <h5 class="card-title">
-                    <i class="bi bi-heart-pulse me-2 text-primary"></i>
-                    System Health
-                </h5>
-                
-                {% if health %}
-                <div class="mb-3">
-                    <span id="health-indicator" class="health-indicator health-online"></span>
-                    <strong>{{ health.status|title }}</strong>
-                </div>
-                
-                <div class="row text-center">
-                    <div class="col-6">
-                        <div class="p-3 bg-light rounded">
-                            <i class="bi bi-droplet-fill text-primary fs-4"></i>
-                            <div class="mt-2">
-                                <strong>{{ health.water_level }}%</strong>
-                                <div class="small text-muted">Water Level</div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-6">
-                        <div class="p-3 bg-light rounded">
-                            <i class="bi bi-thermometer-half text-warning fs-4"></i>
-                            <div class="mt-2">
-                                <strong>{{ health.system_temperature }}</strong>
-                                <div class="small text-muted">Temperature</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="mt-3">
-                    <small class="text-muted">
-                        <i class="bi bi-clock me-1"></i>
-                        Last updated: {{ health.timestamp[:19] if health.timestamp else 'Unknown' }}
-                    </small>
-                </div>
-                {% else %}
-                <div class="text-center text-muted">
-                    <i class="bi bi-wifi-off fs-1"></i>
-                    <p class="mt-2">Backend Disconnected</p>
-                    <span id="health-indicator" class="health-indicator health-offline"></span>
-                    Check API connection
-                </div>
-                {% endif %}
-            </div>
-        </div>
-    </div>
+{% block title %}Dashboard — SolarSage{% endblock %}
+{% block page_eyebrow %}Array 01 · Bengaluru{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
 
-    <!-- Latest Decision Card -->
-    <div class="col-lg-8 mb-4">
-        <div class="card h-100">
-            <div class="card-body">
-                <h5 class="card-title">
-                    <i class="bi bi-lightning-charge me-2 text-warning"></i>
-                    Latest Decision
-                </h5>
-                
-                {% if latest_decision and latest_decision.get('decision_id') %}
-                <div class="row">
-                    <div class="col-md-6">
-                        <p><strong>Panel ID:</strong> {{ latest_decision.panel_id }}</p>
-                        <p><strong>Decision:</strong> 
-                            <span class="badge {{ 'bg-danger' if latest_decision.decision == 'spray_now' else 'bg-warning' if latest_decision.decision == 'schedule_cleaning' else 'bg-success' }}">
-                                {{ latest_decision.decision.replace('_', ' ')|title }}
-                            </span>
-                        </p>
-                        <p><strong>Dust Level:</strong> {{ (latest_decision.dust_level * 100)|round(1) }}%</p>
-                    </div>
-                    <div class="col-md-6">
-                        <p><strong>Confidence:</strong> {{ (latest_decision.confidence * 100)|round(1) }}%</p>
-                        <p><strong>Water Volume:</strong> {{ latest_decision.water_volume }}ml</p>
-                        <p><strong>Duration:</strong> {{ latest_decision.spray_duration }}s</p>
-                    </div>
-                </div>
-                
-                {% set a = latest_decision.analysis %}
-                {% if a %}
-                <div class="row text-center g-2 mb-3">
-                    <div class="col-4">
-                        <div class="p-2 bg-light rounded">
-                            <div class="fw-bold">{{ a.daily_power_loss_kwh }} kWh</div>
-                            <div class="small text-muted">Daily loss ({{ a.power_loss_percentage }}%)</div>
-                        </div>
-                    </div>
-                    <div class="col-4">
-                        <div class="p-2 bg-light rounded">
-                            <div class="fw-bold">${{ a.estimated_savings_weekly }}</div>
-                            <div class="small text-muted">Weekly savings</div>
-                        </div>
-                    </div>
-                    <div class="col-4">
-                        <div class="p-2 bg-light rounded">
-                            <div class="fw-bold">{{ a.optimal_cleaning_window.replace('_', ' ')|title }}</div>
-                            <div class="small text-muted">Cleaning window</div>
-                        </div>
-                    </div>
-                </div>
-                {% endif %}
-
-                <div class="alert alert-info">
-                    <i class="bi bi-info-circle me-2"></i>
-                    {{ latest_decision.action }}
-                    {% if latest_decision.auto_clean %}
-                        {% if latest_decision.auto_clean.error %}
-                        <div class="mt-2 small text-danger">
-                            <i class="bi bi-exclamation-triangle me-1"></i>{{ latest_decision.auto_clean.error }}
-                        </div>
-                        {% else %}
-                        <div class="mt-2 small">
-                            <i class="bi bi-check2-circle me-1"></i>
-                            Auto-cleaned: {{ latest_decision.auto_clean.water_used_ml }}ml over
-                            {{ latest_decision.auto_clean.duration_seconds }}s
-                        </div>
-                        {% endif %}
-                    {% endif %}
-                </div>
-
-                {% if a and a.insights %}
-                <ul class="small text-muted mb-2">
-                    {% for insight in a.insights[:3] %}<li>{{ insight }}</li>{% endfor %}
-                </ul>
-                {% endif %}
-                
-                <small class="text-muted">
-                    <i class="bi bi-clock me-1"></i>
-                    {{ latest_decision.timestamp[:19] if latest_decision.timestamp else 'Unknown' }}
-                </small>
-                {% else %}
-                <div class="text-center text-muted">
-                    <i class="bi bi-search fs-1"></i>
-                    <p class="mt-2">No decisions made yet</p>
-                    <button class="btn btn-solar" onclick="quickAnalyzeAll(event)" id="quick-analyze-btn">
-                        <i class="bi bi-search me-2"></i>Quick Analyze All
-                    </button>
-                </div>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Panels Overview -->
-<div class="row">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h5 class="card-title mb-0">
-                        <i class="bi bi-grid-3x3-gap me-2 text-info"></i>
-                        Solar Panels Overview
-                    </h5>
-                    
-                    <div>
-                        <button class="btn btn-solar btn-sm me-2" onclick="quickAnalyzeAll(event)" id="quick-analyze-btn-2">
-                            <i class="bi bi-search me-2"></i>Analyze All
-                        </button>
-                        <a href="{{ url_for('panels_page') }}" class="btn btn-outline-primary btn-sm">
-                            <i class="bi bi-arrow-right me-2"></i>View Details
-                        </a>
-                    </div>
-                </div>
-
-                {% if panels and panels.panels %}
-                <div class="panel-grid">
-                    {% for panel in panels.panels %}
-                    <div class="panel-card">
-                        <div class="d-flex justify-content-between align-items-start mb-3">
-                            <h6 class="mb-0">
-                                <i class="bi bi-square me-2"></i>
-                                {{ panel.id|title }}
-                            </h6>
-                            <span class="status-badge {{ 'status-clean' if panel.status == 'clean' else 'status-moderate' if 'moderate' in panel.status else 'status-dirty' }}">
-                                {{ panel.status.replace('_', ' ')|title }}
-                            </span>
-                        </div>
-                        
-                        <p class="text-muted small mb-3">
-                            <i class="bi bi-calendar me-1"></i>
-                            Last cleaned: {{ panel.last_cleaned }}
-                        </p>
-                        
-                        <div class="d-flex gap-2">
-                            <a href="{{ url_for('analyze_panel', panel_id=panel.id) }}" 
-                               class="btn btn-outline-primary btn-sm flex-fill">
-                                <i class="bi bi-search me-1"></i>Analyze
-                            </a>
-                            <a href="{{ url_for('spray_panel', panel_id=panel.id) }}" 
-                               class="btn btn-outline-success btn-sm flex-fill">
-                                <i class="bi bi-droplet me-1"></i>Clean
-                            </a>
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
-                
-                <div class="mt-4 text-center">
-                    <div class="bg-light rounded p-3 d-inline-block">
-                        <strong>Total Panels: {{ panels.total_panels }}</strong>
-                        <span class="text-muted ms-3">
-                            <i class="bi bi-check-circle text-success me-1"></i>
-                            Clean: {{ panels.panels|selectattr("status", "equalto", "clean")|list|length }}
-                        </span>
-                        <span class="text-muted ms-3">
-                            <i class="bi bi-exclamation-triangle text-warning me-1"></i>
-                            Needs Attention: {{ panels.panels|rejectattr("status", "equalto", "clean")|list|length }}
-                        </span>
-                    </div>
-                </div>
-                {% else %}
-                <div class="text-center text-muted py-5">
-                    <i class="bi bi-grid fs-1"></i>
-                    <p class="mt-2">No panels data available</p>
-                    <small>Check backend connection</small>
-                </div>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Quick Actions -->
-<div class="row mt-4">
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-body text-center">
-                <i class="bi bi-lightning-charge fs-1 text-warning mb-3"></i>
-                <h6>Emergency Clean All</h6>
-                <p class="text-muted small">Initiate cleaning for all panels immediately</p>
-                <button class="btn btn-warning btn-sm" onclick="emergencyCleanAll(event)">
-                    <i class="bi bi-exclamation-triangle me-2"></i>Emergency Clean
-                </button>
-            </div>
-        </div>
-    </div>
-      <div class="col-md-6">
-        <div class="card">
-            <div class="card-body text-center">
-                <i class="bi bi-graph-up fs-1 text-info mb-3"></i>
-                <h6>System Reports</h6>
-                <p class="text-muted small">View detailed analytics and performance</p>
-                <a href="{{ url_for('system_reports') }}" class="btn btn-info btn-sm">
-                    <i class="bi bi-graph-up me-2"></i>View Reports
-                </a>
-            </div>
-        </div>
-    </div>
-</div>
+{% block page_actions %}
+  <button class="btn btn--sm" type="button" data-action="analyze-all">
+    {{ icon('scan', 14) }} Analyse all
+  </button>
+  <button class="btn btn--sm btn--water" type="button" data-action="clean-dirty">
+    {{ icon('droplet', 14) }} Wash what needs it
+  </button>
 {% endblock %}
 
-{% block scripts %}
-<script>
-function emergencyCleanAll(event) {
-    if (!confirm('Are you sure you want to start emergency cleaning for ALL panels? This will use significant water.')) return;
+{% block page %}
 
-    const btn = event.currentTarget;
-    const label = btn.innerHTML;
-    btn.disabled = true;
-    btn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Cleaning...';
+<section class="grid dash__top">
+  <!-- system health -->
+  <article class="panel dash__health">
+    <div class="panel__head">
+      <h2 class="panel__title">System</h2>
+      {% if health %}
+      <span class="pill pill--live pill--{{ health.status }}" data-live="system-status">
+        <span class="pill__dot"></span>{{ health.status|title }}
+      </span>
+      {% else %}
+      <span class="pill pill--unknown"><span class="pill__dot"></span>Offline</span>
+      {% endif %}
+    </div>
 
-    fetch('/api/emergency-clean-all')
-        .then(response => response.json())
-        .then(data => {
-            btn.disabled = false;
-            btn.innerHTML = label;
+    {% if health %}
+    <div class="tankrow">
+      <div class="tank" style="--level: {{ health.water_level }}%" data-live="water-tank"
+           role="img" aria-label="Water tank {{ health.water_level }} per cent full">
+        <div class="tank__fill"><span class="tank__wave"></span></div>
+        <div class="tank__ticks" aria-hidden="true"><i></i><i></i><i></i></div>
+      </div>
 
-            if (data.error) {
-                alert('Emergency cleaning failed: ' + data.error);
-                return;
-            }
-            let msg = `${data.message}\n\nDetails:\n- Panels cleaned: ${data.successful_cleanings}/${data.total_panels}` +
-                      `\n- Water used: ${data.total_water_used}ml`;
-            if (data.failures && data.failures.length) {
-                msg += '\n\nFailed:\n' + data.failures.map(f => `- ${f.panel_id}: ${f.error}`).join('\n');
-            }
-            alert(msg);
-            location.reload();
-        })
-        .catch(error => {
-            btn.disabled = false;
-            btn.innerHTML = label;
-            alert('Emergency cleaning failed: ' + error.message);
-        });
-}
-</script>
+      <div class="tankrow__facts">
+        <p class="label">Water tank</p>
+        <p class="numeral tankrow__value" data-count="{{ health.water_level }}" data-decimals="1" data-suffix="%">
+          {{ health.water_level }}%
+        </p>
+        <p class="mono text-faint" data-live="water-text">
+          {{ health.water.remaining_ml }} of {{ health.water.capacity_ml }} ml
+        </p>
+        <button class="btn btn--sm" type="button" data-action="refill">
+          {{ icon('droplet', 13) }} Refill tank
+        </button>
+      </div>
+    </div>
+
+    <dl class="factlist">
+      <div><dt>{{ icon('camera', 14) }} Cameras</dt>
+        <dd class="{{ 'text-water' if health.camera_status == 'online' else 'text-dust' }}">{{ health.camera_status|title }}</dd></div>
+      <div><dt>{{ icon('thermometer', 14) }} Array temperature</dt><dd>{{ health.system_temperature }}</dd></div>
+      <div><dt>{{ icon('clock', 14) }} Uptime</dt><dd>{{ stats.system_uptime if stats else '—' }}</dd></div>
+      <div><dt>{{ icon('wifi', 14) }} Telemetry</dt>
+        <dd>{{ 'Receiving' if health.telemetry_available else 'No capture' }}</dd></div>
+    </dl>
+    {% else %}
+    <p class="empty">
+      {{ icon('alert', 20) }}
+      The service layer did not answer. Reload the page; if it keeps failing, check the backend log.
+    </p>
+    {% endif %}
+  </article>
+
+  <!-- latest decision -->
+  <article class="panel dash__decision">
+    <div class="panel__head">
+      <h2 class="panel__title">Last decision</h2>
+      {% if decision.get('decision') %}
+      <span class="pill pill--{{ 'needs_cleaning' if decision.decision == 'spray_now' else 'moderate' if decision.decision == 'schedule_cleaning' else 'clean' }}">
+        <span class="pill__dot"></span>{{ decision.decision.replace('_', ' ')|title }}
+      </span>
+      {% endif %}
+    </div>
+
+    {% if decision.get('decision_id') %}
+    <p class="decision__action" data-live="decision-action">{{ decision.action }}</p>
+
+    <div class="decision__grid">
+      <div><p class="label">Panel</p><p class="mono decision__value" data-live="decision-panel">{{ decision.panel_id }}</p></div>
+      <div><p class="label">Dust coverage</p>
+        <p class="numeral decision__value text-dust" data-live="decision-dust"
+           data-count="{{ (decision.dust_level * 100)|round(1) }}" data-decimals="1" data-suffix="%">
+          {{ (decision.dust_level * 100)|round(1) }}%</p></div>
+      <div><p class="label">Confidence</p>
+        <p class="numeral decision__value" data-count="{{ (decision.confidence * 100)|round(1) }}" data-decimals="1" data-suffix="%">
+          {{ (decision.confidence * 100)|round(1) }}%</p></div>
+      <div><p class="label">Water planned</p><p class="numeral decision__value">{{ decision.water_volume }}<span class="decision__unit">ml</span></p></div>
+    </div>
+
+    {% if analysis %}
+    <div class="econ">
+      <div><p class="label">Lost per day</p><p class="mono">{{ analysis.daily_power_loss_kwh }} kWh ({{ analysis.power_loss_percentage }}%)</p></div>
+      <div><p class="label">Saved per week</p><p class="mono text-water">${{ analysis.estimated_savings_weekly }}</p></div>
+      <div><p class="label">Payback</p>
+        <p class="mono">{{ analysis.payback_period_days }} days
+          {% if analysis.roi_percentage is not none %}
+          <span class="{{ 'text-alarm' if analysis.roi_percentage < 0 else 'text-water' }}">
+            ({{ analysis.roi_percentage }}% ROI)</span>
+          {% endif %}
+        </p></div>
+      <div><p class="label">Best window</p><p class="mono">{{ analysis.optimal_cleaning_window.replace('_', ' ')|title }}</p></div>
+    </div>
+    {% endif %}
+
+    {% if decision.get('auto_clean') %}
+      {% if decision.auto_clean.get('error') %}
+      <p class="note note--error">{{ icon('alert', 14) }} Auto-wash refused: {{ decision.auto_clean.error }}</p>
+      {% else %}
+      <p class="note note--ok">{{ icon('check', 14) }}
+        Auto-washed with {{ decision.auto_clean.water_used_ml }}ml over {{ decision.auto_clean.duration_seconds }}s.</p>
+      {% endif %}
+    {% endif %}
+
+    {% if analysis.get('insights') %}
+    <ul class="insights">
+      {% for line in analysis.insights[:3] %}<li>{{ line }}</li>{% endfor %}
+    </ul>
+    {% endif %}
+
+    <p class="mono text-faint decision__stamp" data-live="decision-stamp"
+       data-decision-id="{{ decision.decision_id }}">{{ (decision.timestamp or '')[:19]|replace('T', ' ') }} UTC</p>
+    {% else %}
+    <div class="empty empty--tall">
+      {{ icon('scan', 22) }}
+      <p>Nothing has been analysed yet. Run the analyser and the decision it makes will show up here.</p>
+      <button class="btn btn--sun btn--sm" type="button" data-action="analyze-all">Analyse all panels</button>
+    </div>
+    {% endif %}
+  </article>
+</section>
+
+<!-- panels -->
+<section class="panel dash__panels">
+  <div class="panel__head">
+    <h2 class="panel__title">Panels</h2>
+    <div class="row">
+      <span class="mono text-faint">
+        <span data-live="count" data-count-key="clean">{{ counts.clean }}</span> clean ·
+        <span data-live="count" data-count-key="attention">{{ counts.attention }}</span> need attention ·
+        <span data-live="count" data-count-key="unknown">{{ counts.unknown }}</span> untested
+      </span>
+      <a class="link-arrow" href="{{ url_for('panels_page') }}">All detail {{ icon('arrow', 13) }}</a>
+    </div>
+  </div>
+
+  {% if rows %}
+  <div class="grid grid--4 panelgrid" data-stagger="0.06">
+    {% for panel in rows %}
+    <article class="panelcard" data-panel-card="{{ panel.id }}" data-tilt="6">
+      <header class="row row--between">
+        <h3 class="panelcard__id mono">{{ panel.id|replace('_', ' ')|title }}</h3>
+        <span class="pill pill--{{ panel.status if panel.status != 'moderate_dust' else 'moderate' }}" data-live="panel-status">
+          <span class="pill__dot"></span>{{ panel.status.replace('_', ' ')|title }}
+        </span>
+      </header>
+
+      <p class="numeral panelcard__dust" data-live="panel-dust">
+        {% if panel.dust_level is not none %}{{ (panel.dust_level * 100)|round(1) }}<span class="panelcard__unit">% dust</span>
+        {% else %}—<span class="panelcard__unit">not analysed</span>{% endif %}
+      </p>
+
+      <div class="meter panelcard__meter" data-live="panel-meter"
+           style="--value: {{ ((panel.dust_level or 0) * 100)|round(1) }}%;
+                  --meter-color: {{ 'var(--alarm)' if panel.status == 'needs_cleaning' else 'var(--dust)' if panel.status == 'moderate_dust' else 'var(--water)' }}">
+        <span class="meter__fill"></span>
+      </div>
+
+      <dl class="panelcard__meta">
+        <div><dt>Confidence</dt><dd>{{ (panel.confidence * 100)|round|int ~ '%' if panel.confidence is not none else '—' }}</dd></div>
+        <div><dt>Last washed</dt><dd data-live="panel-cleaned">{{ panel.last_cleaned }}</dd></div>
+      </dl>
+
+      <div class="panelcard__actions">
+        <button class="btn btn--sm" type="button" data-action="analyze" data-panel="{{ panel.id }}">
+          {{ icon('scan', 13) }} Analyse
+        </button>
+        <button class="btn btn--sm btn--water" type="button" data-action="spray" data-panel="{{ panel.id }}">
+          {{ icon('droplet', 13) }} Wash
+        </button>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="empty">{{ icon('grid', 20) }} No panels are configured.</p>
+  {% endif %}
+</section>
+
+<!-- bulk operations -->
+<section class="grid grid--3 dash__bulk" data-stagger="0.08">
+  <article class="panel action">
+    <h3 class="panel__title">{{ icon('scan', 15) }} Analyse every panel</h3>
+    <p class="action__body">Runs the camera and classifier across the array. Washing follows only if a panel crosses the immediate threshold and auto-cleaning is on.</p>
+    <button class="btn btn--sm btn--block" type="button" data-action="analyze-all">Run analysis</button>
+  </article>
+
+  <article class="panel action">
+    <h3 class="panel__title">{{ icon('droplet', 15) }} Wash what needs it</h3>
+    <p class="action__body">Sprays only the panels currently marked dusty or worse. Uses {{ config.spray_duration * 20 }}ml per panel at {{ config.water_pressure }} pressure.</p>
+    <button class="btn btn--sm btn--water btn--block" type="button" data-action="clean-dirty">Wash dusty panels</button>
+  </article>
+
+  <article class="panel action action--danger">
+    <h3 class="panel__title">{{ icon('alert', 15) }} Wash everything</h3>
+    <p class="action__body">Sprays all {{ counts.total }} panels regardless of state — about {{ counts.total * config.spray_duration * 20 }}ml from a {{ health.water.capacity_ml if health else 0 }}ml tank.</p>
+    <button class="btn btn--sm btn--danger btn--block" type="button" data-action="clean-all">Wash all panels</button>
+  </article>
+</section>
+
 {% endblock %}

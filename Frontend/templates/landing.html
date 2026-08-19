@@ -1,0 +1,429 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+
+{% set analysis = (latest_decision or {}).get('analysis') or {} %}
+{% set rows = (panels or {}).get('panels', []) %}
+{% set readings = (telemetry or {}).get('readings', []) %}
+{# The capture covers the whole ESP32 network; only the first nodes are wired
+   to the panels this system controls. #}
+{% set mapped = readings[:panel_ids|length] %}
+
+{% block title %}SolarSage — the array that washes itself{% endblock %}
+
+{% block styles %}
+  <link rel="stylesheet" href="{{ asset_url('css/landing.css') }}">
+{% endblock %}
+
+{% block body_class %}landing{% endblock %}
+
+{% block chrome %}
+<header class="topline">
+  <div class="shell topline__inner">
+    <a class="wordmark" href="{{ url_for('landing') }}">
+      <span class="wordmark__mark" aria-hidden="true"></span>
+      <span>SolarSage<span class="text-sun">.</span></span>
+    </a>
+
+    <nav class="topline__nav" aria-label="Sections">
+      <a href="#cost">The cost</a>
+      <a href="#loop">The loop</a>
+      <a href="#field">In the field</a>
+      <a href="#console">Console</a>
+    </nav>
+
+    <a class="btn btn--sun btn--sm" href="{{ url_for('dashboard') }}" data-magnetic="0.2">
+      Open the console {{ icon('arrow', 14) }}
+    </a>
+  </div>
+</header>
+{% endblock %}
+
+{% block content %}
+
+<!-- ── hero ───────────────────────────────────────────────────────────────── -->
+<section class="hero">
+  <div class="hero__field" aria-hidden="true">
+    <canvas id="wafer" class="hero__canvas"></canvas>
+    <div class="hero__horizon"></div>
+  </div>
+
+  <div class="shell hero__inner">
+    <p class="eyebrow hero__eyebrow">Array 01 · Bengaluru · {{ panels.total_panels if panels else 0 }} panels under watch</p>
+
+    <h1 class="display hero__title">
+      <span class="line">Dust takes the yield</span>
+      <span class="line">before anyone <em>sees</em> it.</span>
+    </h1>
+
+    <p class="lede hero__lede">
+      SolarSage reads each panel from its own camera, turns the soiling into
+      kilowatt-hours and rupees, and opens the valve only when the wash pays for itself.
+    </p>
+
+    <div class="hero__actions">
+      <a class="btn btn--sun" href="{{ url_for('dashboard') }}" data-magnetic="0.25">
+        Open the console {{ icon('arrow', 14) }}
+      </a>
+      <button class="btn" type="button" id="replay-cycle">
+        {{ icon('play', 14) }} Run a wash cycle
+      </button>
+    </div>
+
+    <dl class="hero__readout">
+      <div class="readout">
+        <dt class="label">System</dt>
+        <dd>
+          <span class="pill pill--live pill--{{ health.status if health else 'unknown' }}">
+            <span class="pill__dot"></span>{{ (health.status if health else 'offline')|title }}
+          </span>
+        </dd>
+      </div>
+      <div class="readout">
+        <dt class="label">Water tank</dt>
+        <dd class="numeral readout__value"
+            data-count="{{ health.water_level if health else 0 }}" data-decimals="1" data-suffix="%">
+          {{ health.water_level if health else 0 }}%
+        </dd>
+      </div>
+      <div class="readout">
+        <dt class="label">Cameras</dt>
+        <dd class="readout__value mono">{{ (health.camera_status if health else 'offline')|title }}</dd>
+      </div>
+      <div class="readout">
+        <dt class="label">Needs attention</dt>
+        <dd class="numeral readout__value {{ 'text-dust' if counts.attention else 'text-water' }}"
+            data-count="{{ counts.attention }}">{{ counts.attention }}</dd>
+      </div>
+    </dl>
+  </div>
+
+  <div class="hero__scroll mono" aria-hidden="true">scroll</div>
+</section>
+
+<!-- ── the cost of soiling ────────────────────────────────────────────────── -->
+<section class="section" id="cost">
+  <div class="shell">
+    <div class="section__head">
+      <p class="eyebrow" data-reveal>What soiling costs</p>
+      <h2 class="display" data-reveal data-reveal-delay="0.08">
+        A clean panel and a dirty one<br>are the same hardware.
+      </h2>
+      <p class="lede" data-reveal data-reveal-delay="0.14">
+        The difference only shows up as a gap between what the array should make and
+        what it actually makes. That gap is the entire reason to spend water — so the
+        system measures it before it sprays.
+      </p>
+    </div>
+
+    <figure class="curve" data-reveal="scale">
+      <svg viewBox="0 0 600 240" class="curve__svg" role="img"
+           aria-label="Output across a day: the clean curve against the soiled curve, with the lost energy shaded between them.">
+        <defs>
+          <linearGradient id="lossFill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#c4813c" stop-opacity="0.6"/>
+            <stop offset="100%" stop-color="#c4813c" stop-opacity="0.06"/>
+          </linearGradient>
+        </defs>
+
+        <g class="curve__grid">
+          <line x1="0" y1="200" x2="600" y2="200"/>
+          <line x1="0" y1="140" x2="600" y2="140"/>
+          <line x1="0" y1="80" x2="600" y2="80"/>
+          <line x1="0" y1="20" x2="600" y2="20"/>
+        </g>
+
+        <path class="curve__loss" d="M0,200 C90,200 120,60 300,40 C480,60 510,200 600,200
+                                     C510,200 470,105 300,88 C130,105 90,200 0,200 Z"/>
+        <path class="curve__clean" d="M0,200 C90,200 120,60 300,40 C480,60 510,200 600,200"/>
+        <path class="curve__soiled" d="M0,200 C90,200 130,105 300,88 C470,105 510,200 600,200"/>
+
+        <g class="curve__marks">
+          <text x="2" y="228">06:00</text>
+          <text x="285" y="228">12:00</text>
+          <text x="562" y="228">18:00</text>
+        </g>
+      </svg>
+      <figcaption class="curve__key">
+        <span class="key key--clean">Clean output</span>
+        <span class="key key--soiled">Measured output</span>
+        <span class="key key--loss">Energy lost to dust</span>
+      </figcaption>
+    </figure>
+
+    {% if analysis.get('daily_power_loss_kwh') is not none %}
+    <div class="grid grid--3 cost__stats" data-stagger="0.09">
+      <div class="stat panel" data-tilt="4">
+        <p class="label">Lost each day</p>
+        <p class="numeral stat__value" data-count="{{ analysis.daily_power_loss_kwh }}"
+           data-decimals="2" data-suffix=" kWh">{{ analysis.daily_power_loss_kwh }} kWh</p>
+        <p class="stat__note">Measured on {{ latest_decision.panel_id }} at
+          {{ (latest_decision.dust_level * 100)|round(1) }}% dust coverage.</p>
+      </div>
+      <div class="stat panel" data-tilt="4">
+        <p class="label">Output held back</p>
+        <p class="numeral stat__value text-dust" data-count="{{ analysis.power_loss_percentage }}"
+           data-decimals="1" data-suffix="%">{{ analysis.power_loss_percentage }}%</p>
+        <p class="stat__note">Soiling loss the forecaster derived from that coverage.</p>
+      </div>
+      <div class="stat panel" data-tilt="4">
+        <p class="label">Recovered per week</p>
+        <p class="numeral stat__value text-water" data-count="{{ analysis.estimated_savings_weekly }}"
+           data-decimals="2" data-prefix="$">${{ analysis.estimated_savings_weekly }}</p>
+        <p class="stat__note">
+          {% if analysis.cleaning_cost_usd is not none %}Net of the ${{ analysis.cleaning_cost_usd }} a wash costs,
+          paying back in {{ analysis.payback_period_days }} days.{% else %}Net of what the wash costs to run.{% endif %}
+        </p>
+      </div>
+    </div>
+    {% else %}
+    <div class="panel cost__pending" data-reveal>
+      <p class="label">No priced analysis on record</p>
+      <p class="lede" style="margin: 0.75rem 0 1.5rem">
+        The numbers here come from a real classifier run — nothing is filled in until one has happened.
+        Open the console and analyse the array to see what the current soiling is worth.
+      </p>
+      <a class="btn btn--sun" href="{{ url_for('dashboard') }}">Analyse the array</a>
+    </div>
+    {% endif %}
+  </div>
+</section>
+
+<!-- ── the loop ───────────────────────────────────────────────────────────── -->
+<section class="section section--loop" id="loop">
+  <div class="shell">
+    <div class="section__head">
+      <p class="eyebrow" data-reveal>How the loop closes</p>
+      <h2 class="display" data-reveal data-reveal-delay="0.08">Four steps, then it starts again.</h2>
+      <p class="lede" data-reveal data-reveal-delay="0.14">
+        These stages run in order, and each one hands the next a number rather than an
+        opinion. Nothing sprays until the last step has a reason to.
+      </p>
+    </div>
+  </div>
+
+  <div class="loop" id="loop-track">
+    <div class="loop__rail">
+      <article class="stage">
+        <p class="stage__index mono">01</p>
+        <h3 class="display stage__title">Capture</h3>
+        <p class="stage__body">
+          An ESP32 at the array pushes one frame per panel with a sensor sweep beside it —
+          temperature, humidity, irradiance, output.
+        </p>
+        <p class="stage__meta mono">{{ icon('camera', 14) }} {{ panels.total_panels if panels else 0 }} cameras · {{ (health.camera_status if health else 'offline')|title }}</p>
+      </article>
+
+      <article class="stage">
+        <p class="stage__index mono">02</p>
+        <h3 class="display stage__title">Classify</h3>
+        <p class="stage__body">
+          OpenCV scores dust coverage on the frame and returns a confidence next to it,
+          so a bad photo cannot pass itself off as a clean panel.
+        </p>
+        <p class="stage__meta mono">{{ icon('scan', 14) }} coverage + confidence, ~{{ analysis.get('processing_time_ms', '—') }} ms</p>
+      </article>
+
+      <article class="stage">
+        <p class="stage__index mono">03</p>
+        <h3 class="display stage__title">Price</h3>
+        <p class="stage__body">
+          Coverage becomes kilowatt-hours: what the dust costs per day, what a wash costs,
+          and how many days it takes to pay that back.
+        </p>
+        <p class="stage__meta mono">{{ icon('money', 14) }} last run: pays back in {{ analysis.get('payback_period_days', '—') }} days</p>
+      </article>
+
+      <article class="stage stage--act">
+        <p class="stage__index mono">04</p>
+        <h3 class="display stage__title">Act</h3>
+        <p class="stage__body">
+          Above {{ config.dust_threshold }}% coverage the valve opens for
+          {{ config.spray_duration }} seconds at {{ config.water_pressure }} pressure.
+          Between {{ config.schedule_threshold }}% and {{ config.dust_threshold }}% it only schedules.
+          Below that, nothing happens.
+        </p>
+        <p class="stage__meta mono">{{ icon('droplet', 14) }} {{ config.spray_duration * 20 }} ml per cycle</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ── field telemetry ────────────────────────────────────────────────────── -->
+<section class="section" id="field">
+  <div class="shell">
+    <div class="section__head section__head--split">
+      <div>
+        <p class="eyebrow" data-reveal>Last sweep from the array</p>
+        <h2 class="display" data-reveal data-reveal-delay="0.08">Real hardware, real readings.</h2>
+      </div>
+      <p class="mono text-faint field__source" data-reveal="right">
+        {% if telemetry.get('available') %}
+          {{ telemetry.source }}<br>captured {{ (telemetry.captured_at or '')[:19]|replace('T', ' ') }} UTC
+        {% else %}
+          No capture file found in Hardware/
+        {% endif %}
+      </p>
+    </div>
+
+    {% if readings %}
+    <div class="grid grid--4 field__grid" data-stagger="0.08">
+      {% for reading in mapped %}
+      <article class="reading panel" data-tilt="7">
+        <header class="row row--between">
+          <p class="label">{{ reading.panel_id|replace('PANNEL_', 'Panel ') }}</p>
+          <span class="mono text-faint">{{ reading.efficiency }}%</span>
+        </header>
+
+        <div class="reading__ring" style="--value: {{ reading.efficiency }}">
+          <svg viewBox="0 0 100 100" aria-hidden="true">
+            <circle class="reading__track" cx="50" cy="50" r="42"/>
+            <circle class="reading__arc" cx="50" cy="50" r="42"
+                    style="stroke-dashoffset: {{ (264 * (1 - (reading.efficiency|float / 100)))|round(1) }}"/>
+          </svg>
+          <p class="numeral reading__value">{{ reading.efficiency|round|int }}<span class="reading__unit">%</span></p>
+          <p class="label reading__caption">Efficiency</p>
+        </div>
+
+        <dl class="reading__rows">
+          <div><dt>{{ icon('thermometer', 13) }} Cell temp</dt><dd class="tabular">{{ reading.temperature }}°C</dd></div>
+          <div><dt>{{ icon('humidity', 13) }} Humidity</dt><dd class="tabular">{{ reading.humidity }}%</dd></div>
+          <div><dt>{{ icon('clock', 13) }} Spray gap</dt><dd class="tabular">{{ reading.spray_interval }}s</dd></div>
+        </dl>
+      </article>
+      {% endfor %}
+    </div>
+
+    <p class="field__note mono text-faint" data-reveal>
+      {{ readings|length }} nodes reported in this capture; the {{ mapped|length }} wired to
+      panels under management are shown. Across the whole sweep:
+      {{ telemetry.avg_temperature }}°C · {{ telemetry.avg_humidity }}% RH ·
+      {{ telemetry.avg_efficiency }}% efficiency. Raw power and light counts come off the ADC
+      uncalibrated and are left unclipped in the console.
+    </p>
+    {% else %}
+    <p class="panel" data-reveal>No telemetry captures are present, so this section has nothing to show yet.</p>
+    {% endif %}
+  </div>
+</section>
+
+<!-- ── console preview ────────────────────────────────────────────────────── -->
+<section class="section" id="console">
+  <div class="shell console-cta">
+    <div class="console-cta__copy">
+      <p class="eyebrow" data-reveal>The console</p>
+      <h2 class="display" data-reveal data-reveal-delay="0.08">Every panel, one page.</h2>
+      <p class="lede" data-reveal data-reveal-delay="0.14">
+        Status per panel, the decision behind it, the water left in the tank, and the
+        controls to analyse or wash anything by hand. Same numbers, no dashboard theatre.
+      </p>
+      <div class="row row--wrap console-cta__actions" data-reveal data-reveal-delay="0.2">
+        <a class="btn btn--sun" href="{{ url_for('dashboard') }}" data-magnetic="0.25">
+          Open the console {{ icon('arrow', 14) }}
+        </a>
+        <a class="link-arrow" href="{{ url_for('system_reports') }}">Read the reports {{ icon('arrow', 13) }}</a>
+      </div>
+    </div>
+
+    <div class="preview" data-reveal="scale" data-tilt="5">
+      <div class="preview__chrome">
+        <span class="preview__dot"></span><span class="preview__dot"></span><span class="preview__dot"></span>
+        <span class="mono preview__path">solarsage / dashboard</span>
+      </div>
+      <div class="preview__body">
+        <div class="preview__stats">
+          <div><p class="label">Clean</p><p class="numeral text-water">{{ counts.clean }}</p></div>
+          <div><p class="label">Dusty</p><p class="numeral text-dust">{{ counts.moderate_dust }}</p></div>
+          <div><p class="label">Wash now</p><p class="numeral text-alarm">{{ counts.needs_cleaning }}</p></div>
+          <div><p class="label">Untested</p><p class="numeral text-faint">{{ counts.unknown }}</p></div>
+        </div>
+        <ul class="preview__rows">
+          {% for panel in rows %}
+          <li>
+            <span class="mono">{{ panel.id|replace('_', ' ')|title }}</span>
+            <span class="meter preview__meter" style="--value: {{ ((panel.dust_level or 0) * 100)|round(1) }}%;
+                  --meter-color: {{ 'var(--alarm)' if panel.status == 'needs_cleaning' else 'var(--dust)' if panel.status == 'moderate_dust' else 'var(--water)' }}">
+              <span class="meter__fill"></span>
+            </span>
+            <span class="mono text-faint">
+              {% if panel.dust_level is not none %}{{ (panel.dust_level * 100)|round(1) }}% dust{% else %}not analysed{% endif %}
+            </span>
+          </li>
+          {% endfor %}
+        </ul>
+        <div class="preview__tank">
+          <p class="label">Water tank</p>
+          <div class="meter" style="--value: {{ health.water_level if health else 0 }}%; --meter-color: var(--water)">
+            <span class="meter__fill"></span>
+          </div>
+          <p class="mono text-faint">
+            {{ health.water.remaining_ml if health else 0 }} of {{ health.water.capacity_ml if health else 0 }} ml
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── economics ──────────────────────────────────────────────────────────── -->
+<section class="section section--ledger">
+  <div class="shell">
+    <p class="eyebrow" data-reveal>The ledger so far</p>
+    <div class="ledger" data-stagger="0.08">
+      <div class="ledger__item">
+        <p class="numeral ledger__value" data-count="{{ stats.total_analyses if stats else 0 }}">0</p>
+        <p class="label">Panels analysed</p>
+      </div>
+      <div class="ledger__item">
+        <p class="numeral ledger__value" data-count="{{ stats.total_cleanings if stats else 0 }}">0</p>
+        <p class="label">Wash cycles run</p>
+      </div>
+      <div class="ledger__item">
+        <p class="numeral ledger__value" data-count="{{ stats.water_used_total if stats else 0 }}" data-decimals="0" data-suffix=" ml">0</p>
+        <p class="label">Water spent</p>
+      </div>
+      <div class="ledger__item">
+        <p class="numeral ledger__value" data-count="{{ ((stats.avg_dust_level if stats else 0) * 100)|round(1) }}" data-decimals="1" data-suffix="%">0</p>
+        <p class="label">Mean dust coverage</p>
+      </div>
+    </div>
+    <p class="mono text-faint ledger__note" data-reveal>
+      Counted from the system database, not from a brochure. Uptime this process: {{ stats.system_uptime if stats else '—' }}.
+    </p>
+  </div>
+</section>
+
+{% endblock %}
+
+{% block footer %}
+<footer class="footer">
+  <div class="shell">
+    <div class="busbars"></div>
+    <div class="footer__inner">
+      <div>
+        <a class="wordmark" href="{{ url_for('landing') }}">
+          <span class="wordmark__mark" aria-hidden="true"></span>
+          <span>SolarSage<span class="text-sun">.</span></span>
+        </a>
+        <p class="mono text-faint footer__tag">Autonomous soiling control for photovoltaic arrays.</p>
+      </div>
+      <nav class="footer__links" aria-label="Console">
+        <a href="{{ url_for('dashboard') }}">Dashboard</a>
+        <a href="{{ url_for('panels_page') }}">Panels</a>
+        <a href="{{ url_for('system_reports') }}">Reports</a>
+        <a href="{{ url_for('settings_page') }}">Settings</a>
+      </nav>
+      <p class="mono text-faint footer__meta">
+        ESP32 · OpenCV · Flask · FastAPI<br>
+        &copy; {{ now.year }} SolarSage
+      </p>
+    </div>
+  </div>
+</footer>
+{% endblock %}
+
+{% block scripts %}
+<script type="application/json" id="panel-data">
+  {{ rows|tojson }}
+</script>
+<script src="{{ asset_url('js/landing.js') }}" defer></script>
+{% endblock %}

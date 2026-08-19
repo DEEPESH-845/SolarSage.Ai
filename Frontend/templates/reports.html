@@ -1,372 +1,177 @@
-{% extends "base.html" %}
+{% extends "console.html" %}
+{% from "_icons.html" import icon %}
 
-{% block title %}System Reports - Solar Panel Cleaning System{% endblock %}
+{% set rows = (panels or {}).get('panels', []) %}
+{% set errors = logs|selectattr('level', 'equalto', 'ERROR')|list|length %}
+{% set warnings = logs|selectattr('level', 'equalto', 'WARNING')|list|length %}
 
-{% block content %}
-<div class="row">
-    <div class="col-12">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h2>
-                <i class="bi bi-graph-up me-2 text-info"></i>
-                System Reports & Analytics
-            </h2>
-            <div>
-                <button class="btn btn-solar me-2" onclick="refreshReports()">
-                    <i class="bi bi-arrow-clockwise me-2"></i>Refresh Data
-                </button>
-                <a href="{{ url_for('dashboard') }}" class="btn btn-light">
-                    <i class="bi bi-arrow-left me-2"></i>Back to Dashboard
-                </a>
-            </div>
-        </div>
-    </div>
-</div>
+{% block title %}Reports — SolarSage{% endblock %}
+{% block page_eyebrow %}Everything the system has recorded{% endblock %}
+{% block page_title %}Reports{% endblock %}
 
-<!-- System Statistics Cards -->
-<div class="row mb-4">
-    <div class="col-md-3">
-        <div class="card text-center">
-            <div class="card-body">
-                <i class="bi bi-collection fs-1 text-primary mb-2"></i>
-                <h4>{{ stats.total_panels if stats else 'N/A' }}</h4>
-                <p class="text-muted mb-0">Total Panels</p>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card text-center">
-            <div class="card-body">
-                <i class="bi bi-droplet fs-1 text-success mb-2"></i>
-                <h4>{{ stats.total_cleanings if stats else 'N/A' }}</h4>
-                <p class="text-muted mb-0">Total Cleanings</p>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card text-center">
-            <div class="card-body">
-                <i class="bi bi-search fs-1 text-warning mb-2"></i>
-                <h4>{{ stats.total_analyses if stats else 'N/A' }}</h4>
-                <p class="text-muted mb-0">Analyses Performed</p>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card text-center">
-            <div class="card-body">
-                <i class="bi bi-water fs-1 text-info mb-2"></i>
-                <h4>{{ stats.water_used_total if stats else 'N/A' }}ml</h4>
-                <p class="text-muted mb-0">Water Used</p>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Panel Health Overview -->
-<div class="row mb-4">
-    <div class="col-lg-8">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0">
-                    <i class="bi bi-pie-chart me-2"></i>
-                    Panel Health Distribution
-                </h5>
-            </div>
-            <div class="card-body">
-                {% if panels and panels.panels %}
-                <div class="row text-center">
-                    <div class="col-md-4">
-                        <div class="p-3">
-                            <div class="h2 text-success">{{ panels.panels|selectattr("status", "equalto", "clean")|list|length }}</div>
-                            <div class="text-muted">Clean Panels</div>
-                            <div class="progress mt-2" style="height: 10px;">
-                                <div class="progress-bar bg-success" style="width: {{ (panels.panels|selectattr('status', 'equalto', 'clean')|list|length / (panels.total_panels or 1) * 100)|round }}%"></div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="p-3">
-                            <div class="h2 text-warning">{{ panels.panels|selectattr("status", "equalto", "moderate_dust")|list|length }}</div>
-                            <div class="text-muted">Moderate Dust</div>
-                            <div class="progress mt-2" style="height: 10px;">
-                                <div class="progress-bar bg-warning" style="width: {{ (panels.panels|selectattr('status', 'equalto', 'moderate_dust')|list|length / (panels.total_panels or 1) * 100)|round }}%"></div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="p-3">
-                            <div class="h2 text-danger">{{ panels.panels|selectattr("status", "equalto", "needs_cleaning")|list|length }}</div>
-                            <div class="text-muted">Needs Cleaning</div>
-                            <div class="progress mt-2" style="height: 10px;">
-                                <div class="progress-bar bg-danger" style="width: {{ (panels.panels|selectattr('status', 'equalto', 'needs_cleaning')|list|length / (panels.total_panels or 1) * 100)|round }}%"></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="mt-3 text-center">
-                    <div class="alert alert-info">
-                        <i class="bi bi-info-circle me-2"></i>
-                        System Health: <strong>{{ ((panels.panels|selectattr("status", "equalto", "clean")|list|length / (panels.total_panels or 1)) * 100)|round(1) }}%</strong>
-                    </div>
-                </div>
-                {% else %}
-                <div class="text-center text-muted py-4">
-                    <i class="bi bi-exclamation-triangle fs-1"></i>
-                    <p class="mt-2">No panel data available</p>
-                </div>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-    
-    <!-- System Performance -->
-    <div class="col-lg-4">
-        <div class="card h-100">
-            <div class="card-header">
-                <h5 class="mb-0">
-                    <i class="bi bi-speedometer me-2"></i>
-                    System Performance
-                </h5>
-</div>
-<div class="card-body">
-    {% if stats %}
-    <div class="mb-3">
-        <label class="form-label small text-muted">Average Dust Level</label>
-        <div class="progress" style="height: 20px;">
-            <div class="progress-bar bg-warning" style="width: {{ ((stats.avg_dust_level * 100)|round) if stats.avg_dust_level else 0 }}%">
-                {{ ((stats.avg_dust_level * 100)|round) if stats.avg_dust_level else 0 }}%
-            </div>
-        </div>
-    </div>
-                
-                <div class="mb-3">
-                    <label class="form-label small text-muted">System Uptime</label>
-                    <div class="h5 text-success">{{ stats.system_uptime }}</div>
-                </div>
-                
-                <div class="mb-3">
-                    <label class="form-label small text-muted">Water Efficiency</label>
-                    <div class="h6">{{ (stats.water_used_total / stats.total_cleanings)|round(1) if stats.total_cleanings > 0 else 0 }}ml per cleaning</div>
-                </div>
-                
-                {% set error_count = logs|selectattr('level', 'equalto', 'ERROR')|list|length %}
-                {% if error_count %}
-                <div class="alert alert-danger small">
-                    <i class="bi bi-exclamation-octagon me-1"></i>
-                    {{ error_count }} error(s) in the last {{ logs|length }} log entries
-                </div>
-                {% else %}
-                <div class="alert alert-success small">
-                    <i class="bi bi-check-circle me-1"></i>
-                    No errors in the last {{ logs|length }} log entries
-                </div>
-                {% endif %}
-                {% else %}
-                <div class="text-center text-muted">
-                    <i class="bi bi-exclamation-triangle"></i>
-                    <p class="mt-2">Performance data unavailable</p>
-                </div>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Recent Activity Log -->
-<div class="row">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0">
-                    <i class="bi bi-clock-history me-2"></i>
-                    Recent System Activity
-                </h5>
-            </div>
-            <div class="card-body">
-                {% if logs %}
-                <div class="table-responsive">
-                    <table class="table table-hover">
-                        <thead class="table-light">
-                            <tr>
-                                <th><i class="bi bi-calendar me-1"></i>Timestamp</th>
-                                <th><i class="bi bi-gear me-1"></i>Component</th>
-                                <th><i class="bi bi-info-circle me-1"></i>Message</th>
-                                <th><i class="bi bi-flag me-1"></i>Level</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for log in logs[:10] %}
-                            <tr>
-                                <td>
-                                    <small class="text-muted">{{ log.timestamp[:19] if log.timestamp else 'Unknown' }}</small>
-                                </td>
-                                <td>
-                                    <span class="badge bg-secondary">{{ log.component if log.component else 'System' }}</span>
-                                </td>
-                                <td>{{ log.message if log.message else 'Activity logged' }}</td>
-                                <td>
-                                    <span class="badge {{ 'bg-danger' if log.level == 'ERROR' else 'bg-warning text-dark' if log.level == 'WARNING' else 'bg-info' }}">
-                                        {{ log.level if log.level else 'INFO' }}
-                                    </span>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-                {% else %}
-                <div class="text-center text-muted py-4">
-                    <i class="bi bi-journal-text fs-1"></i>
-                    <p class="mt-2">No activity logs available</p>
-                    <small>System logs will appear here as operations are performed</small>
-                </div>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Export Options -->
-<div class="row mt-4">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0">
-                    <i class="bi bi-download me-2"></i>
-                    Export & Reports
-                </h5>
-            </div>
-            <div class="card-body">
-                <div class="row">
-                    <div class="col-md-3">
-                        <button class="btn btn-outline-primary w-100" onclick="exportSystemReport()">
-                            <i class="bi bi-file-text me-2"></i>System Report
-                        </button>
-                    </div>
-                    <div class="col-md-3">
-                        <button class="btn btn-outline-success w-100" onclick="exportPanelData()">
-                            <i class="bi bi-table me-2"></i>Panel Data
-                        </button>
-                    </div>
-                    <div class="col-md-3">
-                        <button class="btn btn-outline-warning w-100" onclick="exportActivityLogs()">
-                            <i class="bi bi-journal me-2"></i>Activity Logs
-                        </button>
-                    </div>
-                    <div class="col-md-3">
-                        <button class="btn btn-outline-info w-100" onclick="exportStatistics()">
-                            <i class="bi bi-graph-up me-2"></i>Statistics
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
+{% block page_actions %}
+  <button class="btn btn--sm" type="button" data-export="report">{{ icon('download', 14) }} Report (JSON)</button>
+  <button class="btn btn--sm" type="button" data-export="panels">{{ icon('download', 14) }} Panels (CSV)</button>
+  <button class="btn btn--sm" type="button" data-export="logs">{{ icon('download', 14) }} Logs (TXT)</button>
 {% endblock %}
 
-{% block scripts %}
-<script>
-function refreshReports() {
-    location.reload();
-}
+{% block page %}
 
-function exportSystemReport() {
-    fetch('/api/system-reports')
-        .then(response => response.json())
-        .then(data => {
-            const report = {
-                generated_at: new Date().toISOString(),
-                system_statistics: data.stats,
-                panel_health: data.panel_health,
-                recent_logs: data.logs
-            };
-            
-            const blob = new Blob([JSON.stringify(report, null, 2)], {type: 'application/json'});
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `solar_system_report_${new Date().toISOString().split('T')[0]}.json`;
-            a.click();
-        })
-        .catch(error => {
-            alert('Export failed: ' + error.message);
-        });
-}
+<section class="grid grid--4 statgrid" data-stagger="0.06">
+  <article class="statcard">
+    <p class="label">Analyses run</p>
+    <p class="numeral statcard__value" data-count="{{ stats.total_analyses if stats else 0 }}">0</p>
+    <p class="statcard__note">Frames scored since the database was created</p>
+  </article>
+  <article class="statcard">
+    <p class="label">Wash cycles</p>
+    <p class="numeral statcard__value text-water" data-count="{{ stats.total_cleanings if stats else 0 }}">0</p>
+    <p class="statcard__note">Successful sprays only — refusals are logged, not counted</p>
+  </article>
+  <article class="statcard">
+    <p class="label">Water spent</p>
+    <p class="numeral statcard__value" data-count="{{ stats.water_used_total if stats else 0 }}" data-suffix=" ml">0</p>
+    <p class="statcard__note">
+      {{ (stats.water_used_total / stats.total_cleanings)|round(1) if stats and stats.total_cleanings else 0 }} ml per cycle
+    </p>
+  </article>
+  <article class="statcard">
+    <p class="label">Mean dust coverage</p>
+    <p class="numeral statcard__value text-dust"
+       data-count="{{ ((stats.avg_dust_level if stats else 0) * 100)|round(1) }}" data-decimals="1" data-suffix="%">0</p>
+    <p class="statcard__note">Across every analysis on record</p>
+  </article>
+</section>
 
-function exportPanelData() {
-    fetch('/api/system-reports')
-        .then(response => response.json())
-        .then(data => {
-            const rows = data.panels || [];
-            let csv = 'Panel ID,Status,Dust Level %,Confidence %,Last Analysed,Last Cleaned\n';
-            rows.forEach(p => {
-                const dust = p.dust_level != null ? (p.dust_level * 100).toFixed(1) : '';
-                const conf = p.confidence != null ? (p.confidence * 100).toFixed(1) : '';
-                csv += `${p.id},${p.status},${dust},${conf},${p.last_analysed || ''},${p.last_cleaned}\n`;
-            });
+<div class="reports__split">
+  <section class="panel">
+    <div class="panel__head">
+      <h2 class="panel__title">Array health</h2>
+      <span class="mono text-faint">{{ counts.health_percentage }}% clean</span>
+    </div>
 
-            const blob = new Blob([csv], {type: 'text/csv'});
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `panel_data_${new Date().toISOString().split('T')[0]}.csv`;
-            a.click();
-        });
-}
+    {% if rows %}
+    {% set circumference = 339.3 %}
+    {% set total = counts.total or 1 %}
+    {% set segments = [
+      ('clean', counts.clean, 'var(--water)'),
+      ('moderate_dust', counts.moderate_dust, 'var(--dust)'),
+      ('needs_cleaning', counts.needs_cleaning, 'var(--alarm)'),
+      ('unknown', counts.unknown, 'var(--ink-faint)')
+    ] %}
+    {% set ns = namespace(offset=0) %}
 
-function exportActivityLogs() {
-    fetch('/api/system-reports')
-        .then(response => response.json())
-        .then(data => {
-            const logs = data.logs || [];
-            let text = 'SOLAR PANEL SYSTEM - ACTIVITY LOG\n';
-            text += '=====================================\n\n';
-            
-            logs.forEach(log => {
-                text += `[${log.timestamp}] ${log.level} ${log.component}: ${log.message}\n`;
-            });
-            
-            const blob = new Blob([text], {type: 'text/plain'});
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `activity_logs_${new Date().toISOString().split('T')[0]}.txt`;
-            a.click();
-        });
-}
+    <div class="donut">
+      <div class="donut__chart">
+        <svg viewBox="0 0 120 120" role="img" aria-label="Panel states: {{ counts.clean }} clean, {{ counts.moderate_dust }} moderate, {{ counts.needs_cleaning }} needing a wash, {{ counts.unknown }} untested.">
+          <circle class="donut__ring" cx="60" cy="60" r="54" stroke="rgba(198,208,228,0.08)"/>
+          {% for name, value, colour in segments %}
+            {% if value %}
+              {% set length = (value / total * circumference)|round(2) %}
+              <circle class="donut__ring" cx="60" cy="60" r="54" stroke="{{ colour }}"
+                      stroke-dasharray="{{ length }} {{ (circumference - length)|round(2) }}"
+                      stroke-dashoffset="{{ (-ns.offset)|round(2) }}"/>
+              {% set ns.offset = ns.offset + length %}
+            {% endif %}
+          {% endfor %}
+        </svg>
+        <div class="donut__center">
+          <p class="numeral donut__value">{{ counts.health_percentage }}%</p>
+          <p class="label">Clean</p>
+        </div>
+      </div>
 
-function exportStatistics() {
-    fetch('/api/system-reports')
-        .then(response => response.json())
-        .then(data => {
-            const stats = {
-                export_date: new Date().toISOString(),
-                statistics: data.stats,
-                panel_health_summary: data.panel_health,
-                performance_metrics: {
-                    uptime: data.stats?.system_uptime || 'Unknown',
-                    efficiency: data.panel_health?.health_percentage || 0,
-                    water_usage_efficiency: data.stats?.water_used_total && data.stats?.total_cleanings ? 
-                        (data.stats.water_used_total / data.stats.total_cleanings).toFixed(1) : 0
-                }
-            };
-            
-            const blob = new Blob([JSON.stringify(stats, null, 2)], {type: 'application/json'});
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `system_statistics_${new Date().toISOString().split('T')[0]}.json`;
-            a.click();
-        });
-}
+      <dl class="donut__legend">
+        {% for name, value, colour in segments %}
+        <div>
+          <span class="donut__swatch" style="background: {{ colour }}"></span>
+          <dt>{{ name.replace('_', ' ')|title }}</dt>
+          <dd class="tabular">{{ value }}</dd>
+        </div>
+        {% endfor %}
+      </dl>
+    </div>
+    {% else %}
+    <p class="empty">{{ icon('chart', 20) }} No panel data to chart yet.</p>
+    {% endif %}
+  </section>
 
-// Auto-refresh every 5 minutes
-setInterval(function() {
-    if (document.visibilityState === 'visible') {
-        location.reload();
-    }
-}, 300000);
-</script>
+  <section class="panel">
+    <div class="panel__head">
+      <h2 class="panel__title">Running state</h2>
+      <span class="pill pill--{{ health.status if health else 'unknown' }}">
+        <span class="pill__dot"></span>{{ (health.status if health else 'unknown')|title }}
+      </span>
+    </div>
+
+    <div class="bars">
+      <div class="bars__row">
+        <div class="bars__head"><span class="text-dim">Mean dust coverage</span>
+          <span class="mono">{{ ((stats.avg_dust_level if stats else 0) * 100)|round(1) }}%</span></div>
+        <div class="meter" style="--value: {{ ((stats.avg_dust_level if stats else 0) * 100)|round(1) }}%; --meter-color: var(--dust)">
+          <span class="meter__fill"></span>
+        </div>
+      </div>
+      <div class="bars__row">
+        <div class="bars__head"><span class="text-dim">Water remaining</span>
+          <span class="mono">{{ health.water_level if health else 0 }}%</span></div>
+        <div class="meter" style="--value: {{ health.water_level if health else 0 }}%; --meter-color: var(--water)">
+          <span class="meter__fill"></span>
+        </div>
+      </div>
+      <div class="bars__row">
+        <div class="bars__head"><span class="text-dim">Panels clean</span>
+          <span class="mono">{{ counts.health_percentage }}%</span></div>
+        <div class="meter" style="--value: {{ counts.health_percentage }}%">
+          <span class="meter__fill"></span>
+        </div>
+      </div>
+    </div>
+
+    <dl class="factlist">
+      <div><dt>{{ icon('clock', 14) }} Process uptime</dt><dd>{{ stats.system_uptime if stats else '—' }}</dd></div>
+      <div><dt>{{ icon('scan', 14) }} Last analysis</dt>
+        <dd>{{ (stats.last_analysis or '')[:19]|replace('T', ' ') if stats and stats.last_analysis else 'never' }}</dd></div>
+      <div><dt>{{ icon('alert', 14) }} Errors in log</dt>
+        <dd class="{{ 'text-alarm' if errors else 'text-water' }}">{{ errors }} of {{ logs|length }}</dd></div>
+      <div><dt>{{ icon('info', 14) }} Warnings in log</dt>
+        <dd class="{{ 'text-dust' if warnings else '' }}">{{ warnings }}</dd></div>
+    </dl>
+  </section>
+</div>
+
+<section class="panel">
+  <div class="panel__head">
+    <h2 class="panel__title">Activity log</h2>
+    <div class="row">
+      <span class="mono text-faint" id="log-count">{{ logs|length }} entries</span>
+      <label class="visually-hidden" for="log-filter">Filter the log</label>
+      <input class="input" id="log-filter" type="search" placeholder="Filter by panel, component or message"
+             style="width: min(22rem, 60vw)">
+    </div>
+  </div>
+
+  {% if logs %}
+  <div class="table-wrap">
+    <table class="data">
+      <thead>
+        <tr><th>Time (UTC)</th><th>Component</th><th>Message</th><th>Level</th></tr>
+      </thead>
+      <tbody>
+        {% for log in logs %}
+        <tr data-log-row="{{ (log.component ~ ' ' ~ log.message ~ ' ' ~ log.level)|lower }}">
+          <td class="mono text-faint">{{ (log.timestamp or '')[:19]|replace('T', ' ') }}</td>
+          <td class="mono">{{ log.component }}</td>
+          <td>{{ log.message }}</td>
+          <td><span class="loglevel loglevel--{{ log.level }}">{{ log.level }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="empty">{{ icon('log', 20) }} Nothing has been logged yet. Run an analysis and entries will appear here.</p>
+  {% endif %}
+</section>
+
 {% endblock %}
