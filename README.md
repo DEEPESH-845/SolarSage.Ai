@@ -176,13 +176,29 @@ Two surfaces, one design system:
 
 * **`/`** — a landing page whose numbers are read from the live system, not
   written into the copy. The hero canvas draws the four modules at their real
-  measured dust coverage and runs a wash pass across them.
+  measured dust coverage and runs a wash pass across them. The bundled fixtures
+  put one panel in each state, so the array is never four identical readings —
+  see `Backend/data/images/README.md`.
 * **`/dashboard`, `/panels`, `/system-reports`, `/settings`** — the operator
   console. Every action reports through a toast and refreshes the affected
   values in place instead of reloading the page.
 
 Colour carries meaning throughout: gold is sunlight, ochre is soiling, teal is
 water, vermilion is a fault.
+
+**One set of tokens drives both.** `Frontend/static/css/core.css` holds the whole
+system, and nothing outside it invents a value:
+
+| Token group | What it fixes |
+|---|---|
+| `--space-1 … --space-8` | A 4px spacing scale. Every gap, pad and margin comes from it |
+| `--metric-xl / lg / md / sm` | Four sizes a number can be, applied as `.numeral--lg` etc. |
+| `--micro-size`, `--micro-track`, `--eyebrow-track`, `--control-track` | One treatment for data labels, one for section eyebrows, one for controls |
+| `.card` (+ `--card-pad`, `--card-tight`) | The single raised surface. Components never redeclare background, border or radius |
+
+So a stat card, a panel card, a loop stage and a telemetry tile are the same
+surface with different contents, and a page is laid out by choosing from eight
+spacing values rather than typing a new decimal.
 
 **No build step.** Templates are Jinja, styles are hand-written CSS, and the
 animation runtimes ([GSAP + ScrollTrigger](https://gsap.com) for scroll

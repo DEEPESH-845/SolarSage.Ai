@@ -18,26 +18,26 @@
 {% block page %}
 
 <section class="grid grid--4 statgrid" data-stagger="0.06">
-  <article class="statcard">
+  <article class="card card--tight statcard">
     <p class="label">Analyses run</p>
-    <p class="numeral statcard__value" data-count="{{ stats.total_analyses if stats else 0 }}">0</p>
+    <p class="numeral numeral--lg statcard__value" data-count="{{ stats.total_analyses if stats else 0 }}">0</p>
     <p class="statcard__note">Frames scored since the database was created</p>
   </article>
-  <article class="statcard">
+  <article class="card card--tight statcard">
     <p class="label">Wash cycles</p>
-    <p class="numeral statcard__value text-water" data-count="{{ stats.total_cleanings if stats else 0 }}">0</p>
+    <p class="numeral numeral--lg statcard__value text-water" data-count="{{ stats.total_cleanings if stats else 0 }}">0</p>
     <p class="statcard__note">Successful sprays only — refusals are logged, not counted</p>
   </article>
-  <article class="statcard">
+  <article class="card card--tight statcard">
     <p class="label">Water spent</p>
-    <p class="numeral statcard__value" data-count="{{ stats.water_used_total if stats else 0 }}" data-suffix=" ml">0</p>
+    <p class="numeral numeral--lg statcard__value" data-count="{{ stats.water_used_total if stats else 0 }}" data-suffix=" ml">0</p>
     <p class="statcard__note">
       {{ (stats.water_used_total / stats.total_cleanings)|round(1) if stats and stats.total_cleanings else 0 }} ml per cycle
     </p>
   </article>
-  <article class="statcard">
+  <article class="card card--tight statcard">
     <p class="label">Mean dust coverage</p>
-    <p class="numeral statcard__value text-dust"
+    <p class="numeral numeral--lg statcard__value text-dust"
        data-count="{{ ((stats.avg_dust_level if stats else 0) * 100)|round(1) }}" data-decimals="1" data-suffix="%">0</p>
     <p class="statcard__note">Across every analysis on record</p>
   </article>
@@ -76,7 +76,7 @@
           {% endfor %}
         </svg>
         <div class="donut__center">
-          <p class="numeral donut__value">{{ counts.health_percentage }}%</p>
+          <p class="numeral numeral--md donut__value">{{ counts.health_percentage }}%</p>
           <p class="label">Clean</p>
         </div>
       </div>
