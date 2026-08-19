@@ -131,6 +131,37 @@ def test_spray_respects_pause_and_the_water_tank():
         db.close()
 
 
+def test_settings_reject_values_that_would_act_badly():
+    db = SessionLocal()
+    try:
+        services.reset_settings(db)
+        saved = services.update_settings(db, {
+            "refresh_interval": 0,          # would become a browser timer of 0ms
+            "dust_threshold": 4000,         # out of range
+            "water_pressure": "firehose",   # not a real setting
+            "auto_clean": "false",          # a string is not automatically True
+            "preferred_time": "not a time",
+        })
+        assert saved["refresh_interval"] >= 5, saved["refresh_interval"]
+        assert saved["dust_threshold"] == 100, saved["dust_threshold"]
+        assert saved["water_pressure"] == "medium", saved["water_pressure"]
+        assert saved["auto_clean"] is False, saved["auto_clean"]
+        assert saved["preferred_time"] == "06:00", saved["preferred_time"]
+    finally:
+        services.reset_settings(db)
+        db.close()
+
+
+def test_unknown_panels_are_refused_everywhere():
+    db = SessionLocal()
+    try:
+        for call in (services.analyze_panel, services.spray_panel, services.panel_history):
+            result = call(db, "../../../etc/passwd")
+            assert "error" in result and "Unknown panel" in result["error"], (call.__name__, result)
+    finally:
+        db.close()
+
+
 def test_health_and_stats_report_real_values():
     db = SessionLocal()
     try:
@@ -175,7 +206,7 @@ def test_flask_pages_and_json_endpoints():
     from Frontend.app import app
 
     client = app.test_client()
-    for path in ("/", "/panels", "/settings", "/system-reports"):
+    for path in ("/", "/dashboard", "/panels", "/settings", "/system-reports"):
         assert client.get(path).status_code == 200, path
 
     for path in ("/api/status", "/api/telemetry", "/api/settings",
@@ -190,9 +221,23 @@ def test_flask_pages_and_json_endpoints():
     assert sum(reports["panel_health"][k] for k in
                ("clean", "moderate_dust", "needs_cleaning", "unknown")) == len(settings.panel_ids)
 
-    # Redirect-back actions must not 500.
-    assert client.get("/analyze/panel_01").status_code == 302
-    assert client.get("/spray/panel_01").status_code == 302
+    # Actions write rows and open a valve, so they are POST-only and redirect back.
+    assert client.post("/analyze/panel_01").status_code == 302
+    assert client.post("/spray/panel_01").status_code == 302
+    assert client.get("/analyze/panel_01").status_code == 405, "GET must not be able to spray"
+    assert client.get("/spray/panel_01").status_code == 405
+
+    # An unknown panel is rejected before it reaches the filesystem or the database.
+    rejected = client.post("/analyze/../../etc/passwd", headers={"X-Requested-With": "fetch"})
+    assert rejected.status_code in (400, 404), rejected.status_code
+
+    # A write asked for by another origin is refused outright.
+    foreign = client.post("/spray/panel_01", headers={"Origin": "https://evil.example"})
+    assert foreign.status_code == 403, foreign.status_code
+
+    # A referrer pointing off-site must not be used as the redirect target.
+    bounced = client.post("/spray/panel_01", headers={"Referer": "https://evil.example/steal"})
+    assert bounced.headers["Location"] in ("/dashboard", "/"), bounced.headers["Location"]
 
 
 def main():
