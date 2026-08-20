@@ -20,7 +20,7 @@ sys.path.insert(0, str(REPO_ROOT))
 TMP_DIR = tempfile.mkdtemp(prefix="solarsage-test-")
 os.environ["DATA_DIR"] = TMP_DIR
 os.environ.pop("SQLITE_DATABASE_PATH", None)
-os.environ.pop("BACKEND_URL", None)
+os.environ.pop("API_TOKEN", None)
 
 from Backend import services  # noqa: E402
 from Backend.config.settings import settings  # noqa: E402
@@ -145,6 +145,47 @@ def test_a_refill_recorded_with_an_offset_still_counts_water():
         db.close()
 
 
+def test_demo_seed_fills_an_empty_database_once():
+    """A console deployed without hardware starts empty on every cold start, so the
+    pages had nothing to show. Seeding must fill it — and never a second time."""
+    import tempfile as _tempfile
+
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+
+    from Backend import demo
+    from Backend.database.models import Base
+
+    engine = create_engine(f"sqlite:///{_tempfile.mkdtemp(prefix='solarsage-demo-')}/fresh.db")
+    Base.metadata.create_all(bind=engine)
+    db = sessionmaker(bind=engine)()
+    try:
+        assert demo.seed_if_empty(db) is True, "an empty database was not seeded"
+
+        panels = services.list_panels(db)["panels"]
+        assert all(p["status"] != "unknown" for p in panels), panels
+        assert all(p["last_cleaned"] != "Never" for p in panels), panels
+        assert len({p["status"] for p in panels}) > 1, "every panel got the same state"
+
+        for panel in panels:
+            history = services.panel_history(db, panel["id"])["status_history"]
+            assert len(history) > demo.HISTORY_POINTS, (panel["id"], len(history))
+
+        stats = services.system_stats(db)
+        assert stats["total_analyses"] and stats["total_cleanings"] and stats["water_used_total"]
+        assert services.latest_decision(db).get("decision_id"), "no decision to show"
+        assert services.get_settings(db)["demo_seeded_at"], "seeded data is not labelled"
+
+        assert demo.seed_if_empty(db) is False, "seeded a database that already had rows"
+        assert services.system_stats(db)["total_analyses"] == stats["total_analyses"]
+
+        # The label survives a settings reset — the rows it describes do.
+        services.reset_settings(db)
+        assert services.get_settings(db)["demo_seeded_at"], "reset dropped the synthetic-data label"
+    finally:
+        db.close()
+
+
 def test_log_limit_is_bounded():
     db = SessionLocal()
     try:
@@ -263,6 +304,59 @@ def test_unknown_panels_are_refused_everywhere():
         db.close()
 
 
+def test_aggregates_and_bulk_operations():
+    """These rules used to live in the Flask frontend. They are business rules —
+    the tallies decide what the console shows and the scope decides what gets wet."""
+    db = SessionLocal()
+    try:
+        services.reset_settings(db)
+        services.refill_tank(db)
+
+        counts = services.panel_counts(services.list_panels(db))
+        assert counts["total"] == len(settings.panel_ids)
+        assert counts["clean"] + counts["moderate_dust"] + counts["needs_cleaning"] \
+            + counts["unknown"] == counts["total"]
+        assert counts["attention"] == counts["moderate_dust"] + counts["needs_cleaning"]
+
+        view = services.overview(db)
+        assert set(view) == {"health", "panels", "counts", "stats",
+                             "latest_decision", "settings", "timestamp"}
+        assert len(view["panels"]) == counts["total"]
+
+        detail = services.panel_detail(db, "panel_01")
+        assert detail["panel"]["id"] == "panel_01"
+        assert "status_history" in detail and "cleaning_history" in detail
+        assert "error" in services.panel_detail(db, "../etc/passwd")
+
+        services.update_settings(db, {"auto_clean": False})
+        analysed = services.analyze_all(db)
+        assert analysed["analysed"] == counts["total"], analysed
+        assert not analysed["failures"], analysed["failures"]
+
+        dirty = services.resolve_spray_scope(db, "dirty")
+        every = services.resolve_spray_scope(db, "all")
+        assert set(dirty) <= set(every) and len(every) == counts["total"]
+
+        washed = services.spray_many(db, "all")
+        assert washed["cleaned"] == len(every), washed
+        assert washed["water_used_ml"] > 0
+
+        # A paused system refuses every panel, and says so per panel.
+        services.update_settings(db, {"system_mode": "paused"})
+        refused = services.spray_many(db, "all")
+        assert refused["cleaned"] == 0 and len(refused["failures"]) == len(every), refused
+
+        try:
+            services.resolve_spray_scope(db, "everything")
+            raise AssertionError("an unknown scope was accepted")
+        except ValueError:
+            pass
+    finally:
+        services.reset_settings(db)
+        services.refill_tank(db)
+        db.close()
+
+
 def test_health_and_stats_report_real_values():
     db = SessionLocal()
     try:
@@ -293,9 +387,16 @@ def test_fastapi_routes():
 
     client = TestClient(app)
     for path in ("/", "/health", "/panels", "/latest-decision", "/system/stats",
-                 "/system/logs", "/settings", "/hardware/telemetry",
-                 "/panels/panel_01/history", "/openapi.json"):
+                 "/system/logs", "/settings", "/hardware/telemetry", "/overview",
+                 "/panels/panel_01/history", "/panels/panel_01/detail", "/openapi.json"):
         assert client.get(path).status_code == 200, path
+
+    # The frontend renders these; an unknown panel must not reach the filesystem.
+    assert client.get("/panels/not_a_panel/detail").status_code == 404
+    assert client.post("/analyze", json={"panel_id": "../../etc/passwd"}).status_code == 404
+    assert client.post("/panels/analyze-all").json()["analysed"] > 0
+    assert client.post("/panels/spray", json={"scope": "dirty"}).status_code == 200
+    assert client.post("/panels/spray", json={"scope": "sideways"}).status_code == 400
 
     assert client.post("/analyze", json={"panel_id": "panel_01"}).status_code == 200
     assert client.post("/spray", json={"panel_id": "panel_01"}).status_code == 200
@@ -303,42 +404,30 @@ def test_fastapi_routes():
     assert client.post("/settings/reset").json()["dust_threshold"] == 60
 
 
-def test_flask_pages_and_json_endpoints():
-    from Frontend.app import app
+def test_a_deployed_api_refuses_unauthenticated_writes():
+    """The API is reachable from anywhere once deployed, and its POST routes open
+    a valve. With API_TOKEN set, a write without the header must not act."""
+    import importlib
 
-    client = app.test_client()
-    for path in ("/", "/dashboard", "/panels", "/settings", "/system-reports"):
-        assert client.get(path).status_code == 200, path
+    from fastapi.testclient import TestClient
 
-    for path in ("/api/status", "/api/telemetry", "/api/settings",
-                 "/api/system-reports", "/api/panel/panel_01"):
-        assert client.get(path).status_code == 200, path
+    os.environ["API_TOKEN"] = "test-token"
+    try:
+        import Backend.api.main as api
 
-    assert client.get("/api/panel/not_a_panel").status_code == 404
-    assert client.post("/api/system-mode", json={"mode": "nope"}).status_code == 400
+        importlib.reload(api)
+        client = TestClient(api.app)
 
-    reports = client.get("/api/system-reports").get_json()
-    assert isinstance(reports["logs"], list), "logs must stay a list — templates slice it"
-    assert sum(reports["panel_health"][k] for k in
-               ("clean", "moderate_dust", "needs_cleaning", "unknown")) == len(settings.panel_ids)
+        assert client.get("/panels").status_code == 200, "reads must stay open"
+        assert client.post("/spray", json={"panel_id": "panel_01"}).status_code == 401
+        assert client.post("/panels/spray", json={"scope": "all"}).status_code == 401
+        assert client.put("/settings", json={"values": {"dust_threshold": 42}}).status_code == 401
 
-    # Actions write rows and open a valve, so they are POST-only and redirect back.
-    assert client.post("/analyze/panel_01").status_code == 302
-    assert client.post("/spray/panel_01").status_code == 302
-    assert client.get("/analyze/panel_01").status_code == 405, "GET must not be able to spray"
-    assert client.get("/spray/panel_01").status_code == 405
-
-    # An unknown panel is rejected before it reaches the filesystem or the database.
-    rejected = client.post("/analyze/../../etc/passwd", headers={"X-Requested-With": "fetch"})
-    assert rejected.status_code in (400, 404), rejected.status_code
-
-    # A write asked for by another origin is refused outright.
-    foreign = client.post("/spray/panel_01", headers={"Origin": "https://evil.example"})
-    assert foreign.status_code == 403, foreign.status_code
-
-    # A referrer pointing off-site must not be used as the redirect target.
-    bounced = client.post("/spray/panel_01", headers={"Referer": "https://evil.example/steal"})
-    assert bounced.headers["Location"] in ("/dashboard", "/"), bounced.headers["Location"]
+        headers = {"X-API-Key": "test-token"}
+        assert client.post("/spray", json={"panel_id": "panel_01"}, headers=headers).status_code == 200
+    finally:
+        os.environ.pop("API_TOKEN", None)
+        importlib.reload(api)
 
 
 def main():

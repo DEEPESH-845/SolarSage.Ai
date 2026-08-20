@@ -1,4 +1,4 @@
-# Nothing here is needed by the deployed frontend.
+# Nothing here is needed by the deployed API.
 .venv/
 .git/
 .remember/
@@ -6,6 +6,8 @@ __pycache__/
 **/__pycache__/
 assets/
 tests/
+docs/
+web/
 requirements-dev.txt
 Hardware/MQTT/
 Hardware/MQTT_OFFLINE/

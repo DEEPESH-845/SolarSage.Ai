@@ -29,15 +29,15 @@ class Settings(BaseSettings):
     sqlite_database_path: Optional[Path] = None
 
     panel_ids: List[str] = ["panel_01", "panel_02", "panel_03", "panel_04"]
+
+    # Seed an empty database with synthetic panel history, so a console deployed
+    # without hardware behind it shows a working system rather than four unknown
+    # panels. Set DEMO_DATA=false to leave an empty database empty.
+    demo_data: bool = True
     water_tank_capacity_ml: int = 5000
 
     api_host: str = "0.0.0.0"
     api_port: int = 8000
-    frontend_port: int = 5000
-
-    # Set to a URL to make the Flask frontend call a remote FastAPI backend over
-    # HTTP instead of the in-process service layer.
-    backend_url: Optional[str] = None
 
     @property
     def db_path(self) -> Path:

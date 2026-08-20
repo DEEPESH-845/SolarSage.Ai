@@ -138,33 +138,46 @@ SolarSage employs 4 specialized AI agents that collaborate to optimize solar pan
 ## 🗂️ Project Structure
 
 ```
-├── app.py                     # WSGI entrypoint (Vercel + `python app.py`)
-├── run_system.py              # Local launcher: FastAPI backend + Flask frontend
-├── requirements.txt           # Runtime dependencies
-├── vercel.json                # Serverless function config
+├── api/index.py               # ASGI entrypoint for the deployed API (Vercel)
+├── run_system.py              # Local launcher: FastAPI :8000 + Next.js :3000
+├── requirements.txt           # Python runtime dependencies
+├── vercel.json                # Serverless function config for the API
 ├── Backend/
 │   ├── services.py            # Business logic — the single source of truth
+│   ├── demo.py                # Synthetic panel history for a database with no hardware behind it
 │   ├── agents/
 │   │   └── image_classifier.py    # Adapter onto the CV pipeline in Agents/crew.py
 │   ├── api/main.py            # FastAPI: thin HTTP layer over services
 │   ├── config/settings.py     # Deployment config (paths, ports, tank capacity)
 │   └── database/              # SQLAlchemy models + session handling
-├── Frontend/
-│   ├── app.py                 # Flask UI, calls services in-process
-│   ├── templates/             # Landing page + console (dashboard, panels, reports, settings)
-│   └── static/                # Design system CSS, page scripts, self-hosted fonts, vendored GSAP/Motion
+├── web/                       # Next.js console (App Router, TypeScript)
+│   ├── app/                   # Landing page, (console) route group, server actions
+│   ├── components/ui/         # Design-system primitives: Pill, Card, Meter, Icon, Toast, …
+│   ├── components/console/    # Dashboard, panels, reports and settings components
+│   ├── components/landing/    # Hero canvas, cost curve, loop, telemetry, ledger
+│   ├── lib/                   # Typed API client, formatters, status table, motion hooks
+│   └── styles/                # The design system: core.css, console.css, landing.css
 ├── Agents/crew.py             # CV → forecast → decision → execution pipeline
 ├── Hardware/                  # ESP32 firmware, MQTT tooling, captured telemetry
 └── tests/test_system.py       # End-to-end checks against a temp database
 ```
 
-**How the pieces connect.** `Backend/services.py` holds every operation; both the
-FastAPI backend and the Flask frontend are thin layers over it. The frontend
-therefore needs no running backend — it calls the same functions in-process,
-which is what lets the whole app deploy as a single serverless function. The
-FastAPI service remains available for hardware and external API clients.
+**How the pieces connect.** `Backend/services.py` holds every operation and every
+rule — thresholds, tallies, which panels a bulk wash touches. FastAPI is a thin
+HTTP layer over it, and the console renders what it returns without computing
+anything of its own.
 
-Analysis flows: `Frontend` → `services.analyze_panel` →
+```
+browser ──► Next.js (web/) ──server-side──► FastAPI (api/index.py) ──► Backend/services.py
+                                                                          │
+                                                 SQLite · image fixtures · Agents/crew.py
+```
+
+The browser never calls the API directly: server components fetch during render
+and server actions call it for mutations, so there is no CORS surface and no
+API credentials in the client bundle.
+
+Analysis flows: server action → `POST /analyze` → `services.analyze_panel` →
 `Backend/agents/image_classifier` → `Agents/crew.py`
 (computer vision → 48h forecast → economic decision) → SQLite.
 
@@ -179,15 +192,16 @@ Two surfaces, one design system:
   measured dust coverage and runs a wash pass across them. The bundled fixtures
   put one panel in each state, so the array is never four identical readings —
   see `Backend/data/images/README.md`.
-* **`/dashboard`, `/panels`, `/system-reports`, `/settings`** — the operator
-  console. Every action reports through a toast and refreshes the affected
-  values in place instead of reloading the page.
+* **`/dashboard`, `/panels`, `/reports`, `/settings`** — the operator console.
+  Every action is a server action: it runs on the server, reports through a
+  toast, and revalidates the page so the numbers on screen come from the
+  database rather than from an optimistic guess.
 
 Colour carries meaning throughout: gold is sunlight, ochre is soiling, teal is
 water, vermilion is a fault.
 
-**One set of tokens drives both.** `Frontend/static/css/core.css` holds the whole
-system, and nothing outside it invents a value:
+**One set of tokens drives both.** `web/styles/core.css` holds the whole system,
+and nothing outside it invents a value:
 
 | Token group | What it fixes |
 |---|---|
@@ -200,52 +214,61 @@ So a stat card, a panel card, a loop stage and a telemetry tile are the same
 surface with different contents, and a page is laid out by choosing from eight
 spacing values rather than typing a new decimal.
 
-**No build step.** Templates are Jinja, styles are hand-written CSS, and the
-animation runtimes ([GSAP + ScrollTrigger](https://gsap.com) for scroll
-choreography, [Motion](https://motion.dev) — Framer Motion's vanilla build — for
-spring-based pointer interactions) are vendored under `Frontend/static/vendor/`
-alongside self-hosted fonts. The page makes no third-party requests, which is
-what lets the Content-Security-Policy stay at `script-src 'self'`.
+**Components, not templates.** The console is Next.js (App Router) with React
+server components doing the rendering and client components only where there is
+genuine interaction — a form, a dialog, a canvas, a filter. The stylesheets are
+the same hand-written CSS the Jinja version used, moved across unchanged, so the
+refactor changed behaviour and not a single colour.
 
-Everything degrades: without JavaScript the pages render and read normally, and
-`prefers-reduced-motion` disables the choreography rather than the content.
+The animation vocabulary lives in `web/lib/motion/` as hooks — `useReveal`,
+`useStagger`, `useCountUp`, `useTilt`, `useMagnetic` — over
+[GSAP + ScrollTrigger](https://gsap.com) for scroll choreography and
+[Motion](https://motion.dev) for spring-based pointer interactions. Fonts are
+self-hosted; the page makes no third-party requests.
 
-### Request shapes
+Everything degrades: the pages are server-rendered and read normally without
+JavaScript, and `prefers-reduced-motion` disables the choreography rather than
+the content.
 
-| Shape | Examples | Notes |
-|---|---|---|
-| Pages | `/`, `/dashboard`, `/panels`, `/system-reports`, `/settings` | Server-rendered HTML |
-| Actions | `POST /analyze/<panel_id>`, `POST /spray/<panel_id>` | POST-only — they write rows and open a valve. Answer JSON to `fetch`, redirect back to a form post |
-| JSON | `/api/live`, `/api/panel/<id>`, `/api/settings`, … | Used by the page scripts |
+### How a screen stays current
+
+A console page renders from one `GET /overview` call. `LiveRefresh` then asks
+the router to re-render on the operator's `refresh_interval`, so the page reads
+the database again and React swaps in what changed — one code path draws the
+page whether it is the first paint or the twentieth refresh. A hidden tab polls
+nothing.
 
 ---
 
 ## 🚀 Quick Start
 
+Two runtimes: Python 3.11+ for the API, Node 20+ for the console.
+
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 
-python run_system.py           # backend :8000 + frontend :5000
+cd web && npm install && cp .env.example .env.local && cd ..
+
+python run_system.py           # API :8000 + console :3000
 ```
 
 | Service | URL |
 |---|---|
-| Landing page | http://localhost:5000 |
-| Console (dashboard) | http://localhost:5000/dashboard |
+| Landing page | http://localhost:3000 |
+| Console (dashboard) | http://localhost:3000/dashboard |
 | REST API | http://localhost:8000 |
 | API docs | http://localhost:8000/docs |
 
 Run either half on its own:
 
 ```bash
-python app.py                                        # frontend only
-python -m uvicorn Backend.api.main:app --reload      # backend only
+python -m uvicorn Backend.api.main:app --reload      # API only
+cd web && npm run dev                                # console only
 ```
 
-> **macOS:** AirPlay Receiver occupies port 5000. Either disable it under
-> System Settings → General → AirDrop & Handoff, or run
-> `FRONTEND_PORT=5001 python run_system.py`.
+The console reads `API_URL` from `web/.env.local`; point it at any host running
+the API.
 
 ---
 
@@ -258,12 +281,18 @@ settings are edited on the Settings page and stored in the database.
 |---|---|---|
 | `DATA_DIR` | `Backend/data` (`/tmp/solarsage` on serverless) | Writable storage for the database and decision files |
 | `SQLITE_DATABASE_PATH` | `<DATA_DIR>/solar_panel_system.db` | Explicit database path |
-| `FRONTEND_PORT` / `API_PORT` | `5000` / `8000` | Server ports |
-| `BACKEND_URL` | unset | Set it to call a remote FastAPI backend over HTTP instead of in-process |
-| `SECRET_KEY` | random per process | Flask session signing — set this in production, or flash messages reset on restart |
-| `FLASK_DEBUG` | unset | `1` enables the Werkzeug debugger and binds to localhost only. Never set it on a shared host |
-| `CORS_ORIGINS` | `http://localhost:5000` | Comma-separated origins allowed to call the API |
+| `API_PORT` | `8000` | Port the API listens on |
+| `API_TOKEN` | unset | Shared secret. When set, every mutating route demands a matching `X-API-Key`; reads stay open |
+| `CORS_ORIGINS` | `http://localhost:3000` | Comma-separated origins allowed to call the API from a browser |
 | `WATER_TANK_CAPACITY_ML` | `5000` | Tank size used for water-level reporting |
+| `DEMO_DATA` | `true` | Seed an empty database with synthetic panel history (see below); `false` leaves it empty |
+
+The console has two of its own, in `web/.env.local`:
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `API_URL` | `http://127.0.0.1:8000` | Where the API lives. Server-side only — it never reaches the browser |
+| `API_TOKEN` | unset | Must match the API's `API_TOKEN` when that is set |
 
 Runtime settings (dust thresholds, spray duration, water pressure, auto-clean,
 notifications, schedule, paused/active mode) live in the `system_settings`
@@ -273,20 +302,25 @@ table and are editable from the UI.
 
 ## 🔒 Security posture
 
-The app has no authentication, so it is meant for a trusted network, not the
-open internet. Within that, the parts that can act are guarded:
+There are no user accounts: the console is meant for a trusted operator, not a
+public sign-up. Within that, the parts that can act are guarded:
 
+* **Writes need a shared secret.** The API is reachable from anywhere once
+  deployed and its POST routes open a valve, so set `API_TOKEN` on both
+  deployments. Every mutating route then demands a matching `X-API-Key`; reads
+  stay open. Left unset the API is open, which is fine on a laptop and not fine
+  in front of a pump.
+* **The browser never holds a credential.** Pages fetch through server
+  components and mutate through server actions, so `API_URL` and `API_TOKEN`
+  live only on the console's server.
 * Panel ids are validated in `Backend/services.py` before they reach the
-  filesystem or the database — every entry point routes through that one check.
-* Anything that writes is POST-only, and a write carrying another site's
-  `Origin` is refused, so a page elsewhere cannot trigger a spray.
+  filesystem or the database — every entry point routes through that one check,
+  and an unknown panel is a 404 rather than a 200 with an error inside it.
 * Settings are range- and type-checked on the way in: a refresh interval
   becomes a browser timer and a spray duration becomes pump seconds, so neither
   is stored unvalidated.
-* Responses carry a strict CSP (`script-src 'self'`), `nosniff`, `DENY` framing
-  and a same-origin referrer policy. `SECRET_KEY` has no fixed fallback.
-* Redirect-back after an action keeps only the path of the referrer, so it
-  cannot be pointed off-site.
+* `CORS_ORIGINS` decides who may call the API from a browser; it defaults to
+  localhost, not to `*`.
 
 ---
 
@@ -294,13 +328,22 @@ open internet. Within that, the parts that can act are guarded:
 
 ```bash
 pip install -r requirements-dev.txt
-python tests/test_system.py
+python tests/test_system.py    # the system: pipeline, rules, API
+
+cd web && npm test             # the console's own logic
+npx tsc --noEmit               # …and its types
 ```
 
-Covers the CV pipeline against the bundled image fixtures, threshold-driven
-decisions, auto-clean gating, water-tank and pause guards, hardware telemetry
-parsing, and every FastAPI and Flask route. It runs against a temporary
-database and never touches the real one.
+The Python suite covers the CV pipeline against the bundled image fixtures,
+threshold-driven decisions, auto-clean gating, water-tank and pause guards,
+the demo seeding, hardware telemetry parsing, the aggregates and bulk
+operations, and every FastAPI route including the token guard. It runs against a
+temporary database and never touches the real one.
+
+The console's tests cover what the console itself decides: formatting a reading
+that might be null, and the one table that maps a panel state to its label,
+colour and next step. Everything else it renders is a rule that lives in Python,
+where it already has tests.
 
 ---
 
@@ -311,6 +354,10 @@ database and never touches the real one.
 | `GET` | `/health` | Water level, camera status, temperature from telemetry |
 | `GET` | `/panels` | All panels with status, dust level and last cleaning |
 | `GET` | `/panels/{id}/history` | Analysis and cleaning history |
+| `GET` | `/panels/{id}/detail` | Current state, history and the panel's sensor node |
+| `GET` | `/overview` | Health, panels, tallies, stats, newest decision and settings in one call |
+| `POST` | `/panels/analyze-all` | Analyse every panel, reporting per-panel failures |
+| `POST` | `/panels/spray` | Bulk wash — `{"scope": "dirty"}` or `{"scope": "all"}` |
 | `POST` | `/analyze` | Run the CV + forecast + decision pipeline for a panel |
 | `POST` | `/spray` | Execute a cleaning cycle |
 | `GET` | `/latest-decision` | Most recent decision with its economic analysis |
@@ -327,22 +374,48 @@ database and never touches the real one.
 
 Live: **https://solarsage-ai.vercel.app**
 
+Two projects from this one repository, because they are two runtimes:
+
+| Project | Root directory | Serves |
+|---|---|---|
+| `solarsage-api` | `.` | `api/index.py` → FastAPI, on the Python runtime |
+| `solarsage-web` | `web` | The Next.js console |
+
 ```bash
 npm i -g vercel
-vercel link
-vercel env add SECRET_KEY production     # generate with: python -c "import secrets;print(secrets.token_hex(32))"
+
+# 1. the API
+vercel link                                      # root directory: .
+vercel env add API_TOKEN production              # python -c "import secrets;print(secrets.token_hex(32))"
+vercel --prod
+
+# 2. the console
+cd web
+vercel link                                      # root directory: web
+vercel env add API_URL production                # https://<the API deployment>
+vercel env add API_TOKEN production              # the same secret
 vercel --prod
 ```
 
-Vercel serves `app.py` as a single Python function. `DATA_DIR` defaults to
-`/tmp/solarsage` automatically when the `VERCEL` environment variable is
-present, because serverless filesystems are read-only apart from `/tmp`.
+`DATA_DIR` defaults to `/tmp/solarsage` automatically when the `VERCEL`
+environment variable is present, because serverless filesystems are read-only
+apart from `/tmp`.
 
 **Storage caveat:** `/tmp` is per-instance and cleared when an instance
 recycles, so the deployed database is ephemeral — fine for a demo, but point
 `SQLITE_DATABASE_PATH` at persistent storage (or move to Postgres) for real
 deployments. Panel images and hardware captures ship with the bundle and are
 read-only, so they always work.
+
+**Synthetic data when there is no hardware:** because that database starts
+empty on every cold start, `Backend/demo.py` seeds it with a week of operation
+the first time it comes up — it runs the real classifier over the four image
+fixtures, then back-fills the wash and the readings taken since it for each
+panel. Nothing is fabricated: the dust levels, forecasts and economics are what
+the pipeline reports for those frames. Seeded databases record a
+`demo_seeded_at` setting, and every console page carries a banner saying so.
+Set `DEMO_DATA=false` to disable it; the seed is a no-op once any real analysis
+exists.
 
 
 ## 📎 License
