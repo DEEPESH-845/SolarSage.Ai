@@ -1,11 +1,11 @@
 # SolarSage — runtime dependencies (web app)
 # Agent research pipelines have their own extras in Agents/requirements.txt
 
-# Web layer
-Flask==3.1.1
+# Web layer. The console is a separate Next.js app (see web/) and needs npm,
+# not pip. Hardware/MQTT_OFFLINE/http_latencyTester.py wants Flask; install it
+# separately if you run that tool.
 fastapi==0.115.12
 uvicorn==0.34.3
-requests==2.32.4
 
 # Data layer
 SQLAlchemy==2.0.41

@@ -1,0 +1,525 @@
+/* ==========================================================================
+   SolarSage — console
+
+   Denser than the landing page and quieter: an operator reads this screen many
+   times a day, so colour is reserved for state and nothing moves without a
+   reason.
+   ========================================================================== */
+
+.console-body {
+  --rail: 15rem;
+  background:
+    radial-gradient(90% 55% at 100% 0%, rgba(53, 214, 195, 0.05), transparent 60%),
+    var(--wafer-900);
+  padding-left: var(--rail);
+}
+
+/* -------------------------------------------------------------------- rail */
+
+.rail {
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: 50;
+  width: var(--rail);
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  padding: 1.5rem 1.1rem;
+  background: rgba(8, 14, 34, 0.72);
+  backdrop-filter: blur(16px);
+  border-right: 1px solid var(--line);
+}
+
+.rail__brand { padding: 0.35rem 0.5rem; }
+
+.rail__nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  flex: 1;
+}
+
+.rail__link {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.62rem 0.75rem;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  letter-spacing: var(--control-track);
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  transition: color 0.25s var(--ease-out), background-color 0.25s var(--ease-out);
+}
+
+.rail__link::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 2px;
+  height: 0;
+  background: var(--sun);
+  transform: translateY(-50%);
+  transition: height 0.3s var(--ease-out);
+}
+
+.rail__link:hover { color: var(--ink); background: rgba(198, 208, 228, 0.05); }
+.rail__link.is-current { color: var(--ink); background: rgba(198, 208, 228, 0.06); }
+.rail__link.is-current::before { height: 60%; }
+
+.rail__foot { padding: 0.25rem 0.4rem; }
+
+@media (max-width: 900px) {
+  .console-body { --rail: 0px; padding-left: 0; padding-bottom: 4.5rem; }
+
+  .rail {
+    inset: auto 0 0 0;
+    width: 100%;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.5rem 0.75rem;
+    border-right: 0;
+    border-top: 1px solid var(--line);
+    background: rgba(8, 14, 34, 0.94);  /* content must not read through the tab bar */
+  }
+
+  .rail__brand,
+  .rail__foot { display: none; }
+  .rail__nav { flex-direction: row; justify-content: space-around; }
+  .rail__link { flex-direction: column; gap: 0.25rem; font-size: 0.58rem; padding: 0.4rem 0.5rem; }
+  .rail__link::before { inset: auto 50% 0 auto; width: 0; height: 2px; transform: translateX(50%); transition: width 0.3s var(--ease-out); }
+  .rail__link.is-current::before { width: 60%; height: 2px; }
+}
+
+/* ------------------------------------------------------------------ topbar */
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  padding: 1.6rem clamp(1.25rem, 3vw, 2.5rem) 1.1rem;
+  /* Opaque, not a fade: scrolled content used to show through the tail. */
+  background: rgba(5, 9, 26, 0.94);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--line);
+}
+
+/* h1.display sets a landing-sized clamp; this needs equal specificity to win. */
+h1.topbar__title { font-size: clamp(1.6rem, 2.6vw, 2.2rem); margin-top: 0.45rem; }
+.topbar__actions { display: flex; gap: 0.6rem; flex-wrap: wrap; }
+
+.console-page {
+  padding: 0.5rem clamp(1.25rem, 3vw, 2.5rem) 4rem;
+  display: grid;
+  gap: var(--space-4);
+}
+
+/* Grid and flex children default to min-width:auto, which lets a wide table push
+   the whole page sideways instead of scrolling inside its own container. */
+.console-page > *,
+.panel { min-width: 0; }
+.table-wrap { max-width: 100%; }
+
+/* ------------------------------------------------------------------- misc */
+
+.empty {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1.25rem;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-sm);
+  color: var(--ink-dim);
+  font-size: 0.92rem;
+}
+
+.empty--tall {
+  flex-direction: column;
+  text-align: center;
+  gap: 1rem;
+  padding: 2.5rem 1.5rem;
+}
+
+.note {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  margin-top: 1.1rem;
+  padding: 0.7rem 0.85rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.88rem;
+  background: rgba(198, 208, 228, 0.05);
+}
+
+.note--ok { color: var(--water); background: rgba(53, 214, 195, 0.08); }
+.note--error { color: var(--alarm); background: rgba(255, 107, 87, 0.08); }
+
+/* Sits above the page rather than inside a card, so it reads as a condition of
+   the whole console and not a remark about one panel. */
+.note--demo {
+  margin: 0 0 var(--space-5);
+  color: var(--sun);
+  background: rgba(255, 211, 122, 0.07);
+  border: 1px solid rgba(255, 211, 122, 0.24);
+  line-height: 1.6;
+}
+
+.note--demo strong { color: var(--ink); font-weight: 600; }
+
+.factlist { margin-top: 1.4rem; font-size: 0.9rem; }
+
+.factlist > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.55rem 0;
+  border-top: 1px solid rgba(198, 208, 228, 0.07);
+}
+
+.factlist dt { display: flex; align-items: center; gap: 0.5rem; color: var(--ink-faint); }
+.factlist dd { font-family: var(--font-mono); font-size: 0.82rem; }
+
+/* --------------------------------------------------------------- dashboard */
+
+.dash__top {
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+  align-items: start;  /* neither card pads itself out to match the other */
+}
+
+@media (max-width: 1000px) {
+  .dash__top { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* water tank: a cell you can read across the room */
+.tankrow { display: flex; gap: var(--space-5); align-items: stretch; }
+
+.tank {
+  position: relative;
+  width: 74px;
+  min-height: 140px;
+  flex: none;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--wafer-900);
+  overflow: hidden;
+}
+
+.tank__fill {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: var(--level, 0%);
+  background: linear-gradient(180deg, rgba(53, 214, 195, 0.55), rgba(53, 214, 195, 0.16));
+  transition: height 1s var(--ease-out);
+}
+
+.tank__wave {
+  position: absolute;
+  inset: -6px -50% auto -50%;
+  height: 12px;
+  border-radius: 50%;
+  background: rgba(53, 214, 195, 0.75);
+  animation: tide 5s var(--ease-in-out) infinite;
+}
+
+@keyframes tide {
+  0%, 100% { transform: translateX(-6%) rotate(-1deg); }
+  50% { transform: translateX(6%) rotate(1deg); }
+}
+
+.tank__ticks {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
+}
+
+.tank__ticks i {
+  height: 1px;
+  margin-left: auto;
+  width: 30%;
+  background: var(--line-strong);
+}
+
+.tankrow__facts { display: flex; flex-direction: column; gap: 0.4rem; align-items: flex-start; }
+
+.tankrow__facts .btn { margin-top: auto; }
+
+.decision__action {
+  font-size: 1.05rem;
+  padding: 0.85rem 1rem;
+  border-left: 2px solid var(--sun);
+  background: rgba(255, 211, 122, 0.06);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+.decision__grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-4);
+  margin: var(--space-5) 0;
+}
+
+.decision__value { margin-top: var(--space-2); }
+.decision__unit { font-size: 0.8rem; color: var(--ink-faint); margin-left: 2px; }
+
+.econ {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.econ > div { background: var(--wafer-800); padding: 0.8rem 0.9rem; }
+.econ .mono { margin-top: 0.35rem; font-size: 0.82rem; }
+
+@media (max-width: 760px) {
+  .decision__grid,
+  .econ { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+.insights {
+  margin-top: 1.2rem;
+  padding-left: 1.1rem;
+  color: var(--ink-dim);
+  font-size: 0.88rem;
+}
+
+.insights li { margin-bottom: 0.35rem; }
+.insights li::marker { color: var(--sun); }
+
+.decision__stamp { margin-top: 1.2rem; font-size: 0.7rem; }
+
+/* ------------------------------------------------------------ panel cards */
+
+
+
+.panelcard {
+  overflow: hidden;
+  transition: border-color 0.3s var(--ease-out);
+}
+
+.panelcard::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--line-strong), transparent);
+}
+
+.panelcard:hover { border-color: var(--line-strong); }
+
+.panelcard__id { font-size: var(--micro-size); letter-spacing: var(--control-track); text-transform: uppercase; white-space: nowrap; }
+
+/* Stacked, not side by side: a wider status pill used to wrap on some cards and
+   not others, so the dust figures in one row no longer lined up. */
+.panelcard > header {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+.panelcard__dust { margin: var(--space-4) 0 var(--space-3); }
+.panelcard__unit { font-size: 0.72rem; color: var(--ink-faint); margin-left: 0.3rem; letter-spacing: 0.06em; }
+.panelcard__dust { display: flex; align-items: baseline; }
+.panelcard__meter { margin-bottom: var(--space-4); }
+
+.panelcard__meta { font-size: 0.78rem; }
+
+.panelcard__meta > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.35rem 0;
+  border-top: 1px solid rgba(198, 208, 228, 0.07);
+}
+
+.panelcard__meta dt { color: var(--ink-faint); }
+.panelcard__meta dd { font-family: var(--font-mono); }
+
+.panelcard__actions { display: flex; gap: var(--space-2); margin-top: var(--space-4); }
+.panelcard__actions .btn { flex: 1; }
+
+/* ---------------------------------------------------------------- actions */
+
+.action { display: flex; flex-direction: column; }
+.action .panel__title { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.7rem; }
+.action__body { font-size: 0.88rem; color: var(--ink-dim); margin-bottom: 1.2rem; flex: 1; }
+.action--danger { border-color: rgba(255, 107, 87, 0.22); }
+
+/* ----------------------------------------------------------------- panels */
+
+.panels__filters {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+
+
+/* Surface comes from .card; these classes only say what is specific to them. */
+.statcard__value { margin: var(--space-3) 0 var(--space-1); }
+.statcard__note { font-size: 0.78rem; color: var(--ink-faint); }
+
+/* --------------------------------------------------------- detail dialog */
+
+.detail__cols {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.5rem;
+}
+
+.detail__cols + .detail__cols { margin-top: 1.75rem; }
+.detail__cols .label { margin-bottom: 0.75rem; display: block; }
+
+@media (max-width: 700px) {
+  .detail__cols { grid-template-columns: minmax(0, 1fr); }
+}
+
+.detail__facts > div,
+.detail__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.45rem 0;
+  border-top: 1px solid rgba(198, 208, 228, 0.07);
+  font-size: 0.85rem;
+}
+
+.detail__facts dt { color: var(--ink-faint); }
+.detail__facts dd { font-size: 0.8rem; }
+.detail__list { list-style: none; padding: 0; }
+.detail__list .mono { font-size: 0.74rem; }
+
+/* ---------------------------------------------------------------- reports */
+
+.reports__split {
+  display: grid;
+  align-items: start;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: var(--space-4);
+}
+
+@media (max-width: 1000px) {
+  .reports__split { grid-template-columns: minmax(0, 1fr); }
+}
+
+.donut { display: flex; align-items: center; gap: 1.75rem; flex-wrap: wrap; }
+.donut__chart { position: relative; width: 168px; height: 168px; flex: none; }
+.donut__chart svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.donut__ring { fill: none; stroke-width: 10; stroke-linecap: butt; }
+
+.donut__center {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  text-align: center;
+}
+
+
+.donut__legend { flex: 1; min-width: 12rem; font-size: 0.86rem; }
+
+.donut__legend > div {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.5rem 0;
+  border-top: 1px solid rgba(198, 208, 228, 0.07);
+}
+
+.donut__swatch { width: 10px; height: 10px; border-radius: 2px; flex: none; }
+.donut__legend .tabular { margin-left: auto; font-family: var(--font-mono); font-size: 0.82rem; }
+
+.loglevel {
+  font-family: var(--font-mono);
+  font-size: var(--micro-size);
+  letter-spacing: var(--control-track);
+  padding: 0.2rem 0.5rem;
+  border-radius: 3px;
+  border: 1px solid currentColor;
+}
+
+.loglevel--INFO { color: var(--ink-dim); }
+.loglevel--WARNING { color: var(--dust); }
+.loglevel--ERROR { color: var(--alarm); }
+
+.bars { display: grid; gap: 0.9rem; }
+.bars__row { display: grid; gap: 0.35rem; }
+.bars__head { display: flex; justify-content: space-between; font-size: 0.82rem; }
+
+/* --------------------------------------------------------------- settings */
+
+.settings__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+  align-items: start;  /* same rule as the dashboard: cards keep their own height */
+}
+
+@media (max-width: 900px) {
+  .settings__grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* The settings page is one form, so its sections need the page's own rhythm
+   rather than collapsing against each other inside the form element. */
+.settings__form {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.settings__actions {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+@media (max-width: 820px) {
+  .settings__actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+.threshold-map {
+  position: relative;
+  height: 46px;
+  margin-top: 0.75rem;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: linear-gradient(
+    90deg,
+    rgba(53, 214, 195, 0.22) 0 var(--schedule, 30%),
+    rgba(196, 129, 60, 0.25) var(--schedule, 30%) var(--immediate, 60%),
+    rgba(255, 107, 87, 0.25) var(--immediate, 60%) 100%
+  );
+  border: 1px solid var(--line);
+}
+
+.threshold-map span {
+  position: absolute;
+  bottom: 6px;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink);
+  opacity: 0.75;
+}
+
+/* Each label sits in the middle of the band it names, so it moves with the slider. */
+.threshold-map span:nth-child(1) { left: calc(var(--schedule, 30%) / 2); transform: translateX(-50%); }
+.threshold-map span:nth-child(2) { left: calc((var(--schedule, 30%) + var(--immediate, 60%)) / 2); transform: translateX(-50%); }
+.threshold-map span:nth-child(3) { left: calc((var(--immediate, 60%) + 100%) / 2); transform: translateX(-50%); }

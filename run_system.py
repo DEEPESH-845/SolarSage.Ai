@@ -1,23 +1,34 @@
 #!/usr/bin/env python3
-"""Start the FastAPI backend and the Flask frontend together.
+"""Start the FastAPI backend and the Next.js console together.
 
-The frontend does not need the backend to be running — it calls the same
-service layer in-process. The backend is started here so the REST API and its
-/docs page are available for hardware and external clients.
+Two processes, because they are two deployments: the API serves JSON on
+API_PORT, and the console renders pages on 3000 by reading that API from its
+server. Set API_URL in web/.env.local if the API is not on the default port.
 """
 
+import shutil
 import socket
 import subprocess
 import sys
 import time
+from pathlib import Path
 
 from Backend.config.settings import settings
 
-COMMANDS = [
-    ("FastAPI backend", [sys.executable, "-m", "uvicorn", "Backend.api.main:app",
-                         "--host", settings.api_host, "--port", str(settings.api_port)]),
-    ("Flask frontend", [sys.executable, "Frontend/app.py"]),
-]
+WEB_DIR = Path(__file__).resolve().parent / "web"
+WEB_PORT = 3000
+
+
+def commands():
+    npm = shutil.which("npm")
+    if npm is None:
+        raise SystemExit("❌ npm was not found. Install Node.js 20+ to run the console.")
+
+    return [
+        ("FastAPI backend", [sys.executable, "-m", "uvicorn", "Backend.api.main:app",
+                             "--host", settings.api_host, "--port", str(settings.api_port)], None),
+        ("Next.js console", [npm, "run", "dev"], WEB_DIR),
+    ]
 
 
 def port_is_free(port):
@@ -31,36 +42,39 @@ def port_is_free(port):
 
 
 def check_ports():
-    """macOS AirPlay Receiver squats on port 5000 — fail with a usable message."""
     busy = [(name, port) for name, port in
-            (("API_PORT", settings.api_port), ("FRONTEND_PORT", settings.frontend_port))
+            (("API_PORT", settings.api_port), ("the console", WEB_PORT))
             if not port_is_free(port)]
     for var, port in busy:
-        print(f"❌ Port {port} is already in use. Free it, or set {var} to another port")
-        print(f"   (e.g. {var}={port + 1} python run_system.py).")
-        if port == 5000 and sys.platform == "darwin":
-            print("   On macOS this is usually AirPlay Receiver: "
-                  "System Settings → General → AirDrop & Handoff.")
+        print(f"❌ Port {port} is already in use. Free it, or set {var} to another port.")
     return not busy
+
+
+def check_dependencies():
+    if not (WEB_DIR / "node_modules").is_dir():
+        print("❌ The console's dependencies are not installed.")
+        print(f"   Run: cd {WEB_DIR.name} && npm install")
+        return False
+    return True
 
 
 def main():
     print("🌞 Solar Panel Cleaning System")
     print("=" * 60)
     print(f"🔧 Backend (FastAPI):  http://localhost:{settings.api_port}")
-    print(f"🌐 Frontend (Flask):   http://localhost:{settings.frontend_port}")
-    print(f"📚 API Documentation:  http://localhost:{settings.api_port}/docs")
+    print(f"🌐 Console (Next.js):  http://localhost:{WEB_PORT}")
+    print(f"📚 API documentation:  http://localhost:{settings.api_port}/docs")
     print("=" * 60)
     print("Press Ctrl+C to stop")
 
-    if not check_ports():
+    if not check_dependencies() or not check_ports():
         return 1
 
     processes = []
     try:
-        for name, command in COMMANDS:
+        for name, command, cwd in commands():
             print(f"▶️  Starting {name}...")
-            processes.append(subprocess.Popen(command))
+            processes.append(subprocess.Popen(command, cwd=cwd))
 
         # Exit as soon as either process dies, so a crashed server is visible.
         while True:

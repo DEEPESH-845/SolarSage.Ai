@@ -1,9 +1,10 @@
-"""Business logic shared by the FastAPI backend and the Flask frontend.
+"""Business logic behind the API.
 
-Both entry points call these functions with a SQLAlchemy session; neither one
-owns behaviour of its own. That keeps the frontend deployable as a single
-process (no HTTP hop to ourselves) while the API stays available for hardware
-and external clients.
+Every route in Backend/api/main.py is a thin wrapper over one of these
+functions, and no behaviour lives anywhere else: the console (web/) renders what
+they return and the hardware clients call the same routes. A rule that decides
+something — a threshold, a tally, which panels a bulk wash touches — belongs
+here, where it has tests, and not in the layer that displays it.
 """
 
 import json
@@ -46,6 +47,7 @@ DEFAULT_SETTINGS = {
     "cleaning_frequency": "weekly",
     "preferred_time": "06:00",
     "tank_refilled_at": None,      # ISO timestamp of the last tank refill
+    "demo_seeded_at": None,        # set by Backend/demo.py — the console labels itself with it
 }
 
 
@@ -177,7 +179,10 @@ def update_settings(db: Session, values: dict) -> dict:
 
 
 def reset_settings(db: Session) -> dict:
-    db.query(SystemSetting).delete()
+    # demo_seeded_at is not a preference, it is a fact about the rows in this
+    # database: clearing it would drop the "synthetic data" label off data that
+    # is still synthetic.
+    db.query(SystemSetting).filter(SystemSetting.key != "demo_seeded_at").delete()
     log_event(db, "WARNING", "settings", "Settings reset to defaults")
     db.commit()
     return get_settings(db)
@@ -570,4 +575,124 @@ def panel_history(db: Session, panel_id: str, limit: int = 10) -> dict:
         "panel_id": panel_id,
         "status_history": [row.to_dict() for row in status_history],
         "cleaning_history": [row.to_dict() for row in cleaning_history],
+    }
+
+
+# --------------------------------------------------------------------------
+# aggregates and bulk operations
+#
+# These used to live in the Flask frontend, which meant the rules for "how many
+# panels need attention" and "which panels does a bulk wash touch" were written
+# in the presentation layer. They are business rules, so they live here and the
+# console only renders what they return.
+# --------------------------------------------------------------------------
+
+DIRTY_STATUSES = ("moderate_dust", "needs_cleaning")
+
+
+def panel_counts(panels: Optional[dict]) -> dict:
+    """Status tallies for the dashboard, the panels page and the reports."""
+    rows = (panels or {}).get("panels", [])
+    counts = {"clean": 0, "moderate_dust": 0, "needs_cleaning": 0, "unknown": 0}
+    for panel in rows:
+        counts[panel["status"]] = counts.get(panel["status"], 0) + 1
+    counts["total"] = len(rows)
+    counts["attention"] = counts["moderate_dust"] + counts["needs_cleaning"]
+    counts["health_percentage"] = round(counts["clean"] / len(rows) * 100, 1) if rows else 0.0
+    return counts
+
+
+def overview(db: Session) -> dict:
+    """Everything a console page shows at once — one call instead of five.
+
+    The frontend polls this on a timer, so it is also the shape that keeps the
+    open page current.
+    """
+    panels = list_panels(db)
+    return {
+        "health": health(db),
+        "panels": panels["panels"],
+        "counts": panel_counts(panels),
+        "stats": system_stats(db),
+        "latest_decision": latest_decision(db),
+        "settings": get_settings(db),
+        "timestamp": utcnow().isoformat(),
+    }
+
+
+def panel_detail(db: Session, panel_id: str) -> dict:
+    """One panel in full: its current state, its history and its sensor node."""
+    invalid = unknown_panel(panel_id)
+    if invalid:
+        return invalid
+
+    summary = next((p for p in list_panels(db)["panels"] if p["id"] == panel_id), None)
+
+    # Hardware logs index panels as PANNEL_0..N, in the same order as panel_ids.
+    hardware_id = f"PANNEL_{settings.panel_ids.index(panel_id)}"
+    readings = latest_telemetry().get("readings", [])
+    reading = next((r for r in readings if r.get("panel_id") == hardware_id), None)
+
+    return {"panel": summary, "telemetry": reading, **panel_history(db, panel_id)}
+
+
+def analyze_all(db: Session) -> dict:
+    """Analyse every configured panel, reporting failures rather than hiding them."""
+    results, failures = [], []
+    for panel in list_panels(db)["panels"]:
+        result = analyze_panel(db, panel["id"])
+        if "error" in result:
+            failures.append({"panel_id": panel["id"], "error": result["error"]})
+        else:
+            results.append(result)
+
+    return {
+        "results": results,
+        "failures": failures,
+        "analysed": len(results),
+        "message": f"Analysed {len(results)} panel(s)"
+                   + (f", {len(failures)} failed" if failures else "") + ".",
+    }
+
+
+def resolve_spray_scope(db: Session, scope: str) -> list:
+    """Which panels a bulk wash touches. 'dirty' is the only one that filters."""
+    rows = list_panels(db)["panels"]
+    if scope == "all":
+        return [panel["id"] for panel in rows]
+    if scope == "dirty":
+        return [panel["id"] for panel in rows if panel["status"] in DIRTY_STATUSES]
+    raise ValueError("scope must be 'dirty' or 'all'")
+
+
+def spray_many(db: Session, scope: str = "dirty") -> dict:
+    """Wash a set of panels. Every panel is sprayed through the same guarded path
+    as a single wash, so a paused system or an empty tank still refuses each one."""
+    total_panels = len(list_panels(db)["panels"])
+    targets = resolve_spray_scope(db, scope)
+
+    if not targets:
+        return {
+            "results": [], "failures": [], "total_panels": total_panels,
+            "targeted": 0, "cleaned": 0, "water_used_ml": 0,
+            "message": "Every panel is clean. Nothing to do.",
+        }
+
+    results, failures, water = [], [], 0.0
+    for panel_id in targets:
+        result = spray_panel(db, panel_id)
+        if "error" in result:
+            failures.append({"panel_id": panel_id, "error": result["error"]})
+        else:
+            results.append(result)
+            water += result.get("water_used_ml", 0)
+
+    return {
+        "results": results,
+        "failures": failures,
+        "total_panels": total_panels,
+        "targeted": len(targets),
+        "cleaned": len(results),
+        "water_used_ml": round(water, 1),
+        "message": f"Cleaned {len(results)} of {len(targets)} panel(s) using {water:.0f}ml.",
     }
