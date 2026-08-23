@@ -430,6 +430,64 @@ def test_a_deployed_api_refuses_unauthenticated_writes():
         importlib.reload(api)
 
 
+def test_the_deployment_entrypoint_serves_every_route():
+    """The deployed API once 404'd on everything.
+
+    The cause was layout, not code: the app was exposed from a module under
+    `api/`, which the platform treats as one function bound to its own path, and
+    a catch-all rewrite then replaced the request path on the way in — so a
+    request for /health reached FastAPI as /api/index and matched no route. The
+    fix is a root-level `main.py`, which the Python runtime serves *every* path
+    through. This test is here so that never silently regresses.
+    """
+    import main
+    from fastapi.testclient import TestClient
+
+    from Backend.api import main as api_main
+
+    assert main.app is api_main.app, "main.py must export the same app the API defines"
+
+    with TestClient(main.app) as client:
+        for path in ("/health", "/overview", "/panels", "/settings", "/hardware/telemetry"):
+            response = client.get(path)
+            assert response.status_code == 200, f"{path} -> {response.status_code}"
+            assert response.json(), f"{path} answered 200 with an empty body"
+
+
+def test_vercel_config_points_at_the_entrypoint_that_exists():
+    """A functions key naming a file that is not there silently loses its
+    settings, and the maxDuration with it."""
+    import json
+
+    config = json.loads((REPO_ROOT / "vercel.json").read_text())
+
+    assert "rewrites" not in config, (
+        "a catch-all rewrite replaces the request path before FastAPI sees it, "
+        "which is what made every deployed route 404"
+    )
+    for target in config.get("functions", {}):
+        assert (REPO_ROOT / target).is_file(), f"vercel.json points at missing {target}"
+
+
+def test_env_example_documents_every_setting_that_exists():
+    """A variable the code reads but the template never mentions is a variable
+    nobody sets on the deployment."""
+    documented = {
+        line.split("=", 1)[0].strip()
+        for line in (REPO_ROOT / ".env.example").read_text().splitlines()
+        if "=" in line and not line.strip().startswith("#")
+    }
+
+    from Backend.config.settings import Settings
+
+    for field in Settings.model_fields:
+        assert field.upper() in documented, f"{field.upper()} is read but undocumented"
+
+    # Read straight from Backend/api/main.py rather than trusting a list here.
+    for name in ("API_TOKEN", "CORS_ORIGINS"):
+        assert name in documented, f"{name} is read by the API but undocumented"
+
+
 def main():
     tests = [value for name, value in sorted(globals().items()) if name.startswith("test_")]
     failures = 0
