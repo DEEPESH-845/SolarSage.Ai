@@ -411,10 +411,13 @@ tallies sum to the panel count, its water spent equals wash count times spray
 volume, and nothing in it is non-finite). Everything else it renders is a rule
 that lives in Python, where it already has tests.
 
-Two of the Python tests exist only to protect the deployment: one asserts the
-root `main.py` entrypoint serves every route, the other that `vercel.json` names
-a file that exists and carries no path-replacing rewrite. Both encode the bug
-that made the deployed API 404 on everything.
+Three of the Python tests exist only to protect the deployment, and each encodes
+a bug that actually shipped: one asserts the root `main.py` entrypoint serves
+every route, one that `vercel.json` names a file that exists and carries no
+path-replacing rewrite (together, the reason the deployed API once 404'd on
+everything), and one that `.vercelignore` excludes nothing either deployment
+needs to build — it listed `web/` from the era of a single project, which
+deleted the console's own source before its build could start.
 
 ---
 
@@ -497,6 +500,12 @@ vercel --prod
 
 `API_TOKEN` must match on both sides. Set it: with it unset the API accepts
 anonymous writes, and anyone who can reach the URL can open a valve.
+
+**One `.vercelignore`, two projects.** Vercel reads it from the repository root
+for both, whatever a project's Root Directory is set to, so it may only list
+paths neither deployment needs. `web/` in particular must never go back in: it
+reads like a saving for the API and it removes the console's source before its
+build starts.
 
 `DATA_DIR` needs no configuration — it defaults to `/tmp/solarsage` whenever the
 `VERCEL` environment variable is present, because serverless filesystems are
