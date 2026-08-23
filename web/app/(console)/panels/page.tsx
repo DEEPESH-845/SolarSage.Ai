@@ -8,7 +8,7 @@ import { analyzeAllAction, sprayManyAction } from "@/app/actions";
 import { Empty } from "@/components/ui/Empty";
 import { Stagger } from "@/components/ui/Motion";
 import { Panel } from "@/components/ui/Surface";
-import { getOverview, getTelemetry } from "@/lib/api";
+import { overviewFeed, telemetryFeed } from "@/lib/feed";
 import { stamp } from "@/lib/format";
 
 /**
@@ -21,7 +21,8 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Panels" };
 
 export default async function PanelsPage() {
-  const [overview, telemetry] = await Promise.all([getOverview(), getTelemetry()]);
+  const { data: overview, source, reason } = await overviewFeed();
+  const telemetry = await telemetryFeed(source);
   const { panels, counts, settings } = overview;
   const readings = telemetry.readings ?? [];
 
@@ -29,7 +30,9 @@ export default async function PanelsPage() {
     <ConsolePage
       eyebrow={`${counts.total} panels · ${counts.attention} needing attention`}
       title="Panels"
-      demo={Boolean(settings.demo_seeded_at)}
+      source={source}
+      reason={reason}
+      seeded={Boolean(settings.demo_seeded_at)}
       refreshInterval={settings.refresh_interval}
       actions={
         <>

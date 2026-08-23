@@ -3,7 +3,7 @@ import { ConsolePage } from "@/components/console/ConsolePage";
 import { HealthCard } from "@/components/console/HealthCard";
 import { SETTINGS_FORM_ID, SettingsForm } from "@/components/console/SettingsForm";
 import { Icon } from "@/components/ui/Icon";
-import { getOverview } from "@/lib/api";
+import { overviewFeed } from "@/lib/feed";
 
 /**
  * Live hardware state: rendered per request, never prerendered. This also keeps
@@ -15,13 +15,16 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Settings" };
 
 export default async function SettingsPage() {
-  const { health, stats, settings } = await getOverview();
+  const { data, source, reason } = await overviewFeed();
+  const { health, stats, settings } = data;
 
   return (
     <ConsolePage
       eyebrow="What the system does on its own"
       title="Settings"
-      demo={Boolean(settings.demo_seeded_at)}
+      source={source}
+      reason={reason}
+      seeded={Boolean(settings.demo_seeded_at)}
       refreshInterval={settings.refresh_interval}
       actions={
         // Submits the form below through the HTML `form` attribute, so the bar
