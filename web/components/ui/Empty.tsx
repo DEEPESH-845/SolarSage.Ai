@@ -28,13 +28,13 @@ export function Note({
   icon,
   children,
 }: {
-  tone: "ok" | "error" | "demo";
+  tone: "ok" | "error" | "demo" | "offline";
   icon: string;
   children: React.ReactNode;
 }) {
   return (
-    <p className={clsx("note", `note--${tone}`)} role={tone === "demo" ? "status" : undefined}>
-      <Icon name={icon} size={tone === "demo" ? 15 : 14} />
+    <p className={clsx("note", `note--${tone}`)} role={tone === "demo" || tone === "offline" ? "status" : undefined}>
+      <Icon name={icon} size={tone === "demo" || tone === "offline" ? 15 : 14} />
       <span>{children}</span>
     </p>
   );

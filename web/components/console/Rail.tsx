@@ -15,7 +15,10 @@ const LINKS = [
 ] as const;
 
 /** The fixed rail of destinations, and the one fact that belongs beside them:
- *  whether the system is allowed to open a valve at all. */
+ *  whether the system is allowed to open a valve at all. Where the numbers came
+ *  from is a per-page fact and lives in the topbar, next to the banner that
+ *  explains it — deriving it twice from two different calls let the two
+ *  disagree. */
 export function Rail({ mode }: { mode: SystemMode }) {
   const pathname = usePathname();
 
