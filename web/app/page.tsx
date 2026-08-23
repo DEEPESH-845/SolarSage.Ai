@@ -7,7 +7,7 @@ import { Ledger } from "@/components/landing/Ledger";
 import { LoopSection } from "@/components/landing/LoopSection";
 import { SiteFooter } from "@/components/landing/SiteFooter";
 import { Topline } from "@/components/landing/Topline";
-import { getOverview, getTelemetry } from "@/lib/api";
+import { overviewFeed, telemetryFeed } from "@/lib/feed";
 import { hasDecision } from "@/lib/status";
 import "@/styles/landing.css";
 
@@ -29,7 +29,8 @@ export const metadata: Metadata = {
  * database — there is no marketing copy standing in for a measurement.
  */
 export default async function LandingPage() {
-  const [overview, telemetry] = await Promise.all([getOverview(), getTelemetry()]);
+  const { data: overview, source } = await overviewFeed();
+  const telemetry = await telemetryFeed(source);
   const { health, panels, counts, stats, latest_decision, settings } = overview;
   const analysis = hasDecision(latest_decision) ? latest_decision.analysis : null;
 
