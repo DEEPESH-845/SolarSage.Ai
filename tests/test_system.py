@@ -469,6 +469,63 @@ def test_vercel_config_points_at_the_entrypoint_that_exists():
         assert (REPO_ROOT / target).is_file(), f"vercel.json points at missing {target}"
 
 
+def test_vercelignore_keeps_what_both_deployments_need():
+    """`web/` was once listed here, back when this repo deployed one project.
+
+    Vercel reads .vercelignore from the repository root for *every* project in
+    the repo, whatever its Root Directory is. So the entry that looked like a
+    saving for the API deployment deleted the console's own source before its
+    build started, and `npm install` failed on a package.json that was no longer
+    there. Anything either deployment needs to build has to survive this file.
+    """
+    from fnmatch import fnmatch
+
+    patterns = [
+        line.strip()
+        for line in (REPO_ROOT / ".vercelignore").read_text().splitlines()
+        if line.strip() and not line.strip().startswith("#")
+    ]
+
+    def excluded(path: str) -> bool:
+        segments = path.split("/")
+        for pattern in patterns:
+            bare = pattern.rstrip("/")
+            # `**/x` means an `x` at any depth, and everything under it.
+            if bare.startswith("**/"):
+                if bare[3:] in segments:
+                    return True
+                continue
+            # A directory entry takes everything beneath it with it.
+            if path == bare or path.startswith(bare + "/"):
+                return True
+            # A glob matches the whole path or any single segment of it.
+            if fnmatch(path, bare) or any(fnmatch(seg, bare) for seg in segments):
+                return True
+        return False
+
+    # What each deployment cannot build without.
+    needed = [
+        "web/package.json",        # the console's install step reads this first
+        "web/next.config.ts",
+        "web/vercel.json",
+        "web/app/page.tsx",
+        "web/lib/feed.ts",
+        "main.py",                 # the API's ASGI entrypoint
+        "requirements.txt",
+        "Backend/api/main.py",
+        "Backend/services.py",
+        "Backend/data/images/panel_01_test.jpg",   # the classifier scores these
+        "Hardware/panel_data_20250612_022015.json",  # telemetry is read from disk
+    ]
+    for path in needed:
+        assert not excluded(path), f".vercelignore excludes {path}, which a deployment needs"
+        assert (REPO_ROOT / path).exists(), f"{path} is referenced but missing"
+
+    # And what neither should ever upload.
+    for path in ("web/node_modules/react/package.json", "web/.next/BUILD_ID", ".venv/bin/python"):
+        assert excluded(path), f".vercelignore should exclude {path}"
+
+
 def test_env_example_documents_every_setting_that_exists():
     """A variable the code reads but the template never mentions is a variable
     nobody sets on the deployment."""
