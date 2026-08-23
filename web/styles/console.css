@@ -115,6 +115,11 @@
 
 /* h1.display sets a landing-sized clamp; this needs equal specificity to win. */
 h1.topbar__title { font-size: clamp(1.6rem, 2.6vw, 2.2rem); margin-top: 0.45rem; }
+
+/* The data-source pill leads the eyebrow. It wraps rather than pushing the row
+   wider, so a narrow phone keeps the badge and the location on separate lines
+   instead of scrolling sideways. */
+.topbar__eyebrow { flex-wrap: wrap; row-gap: 0.4rem; }
 .topbar__actions { display: flex; gap: 0.6rem; flex-wrap: wrap; }
 
 .console-page {
@@ -174,6 +179,19 @@ h1.topbar__title { font-size: clamp(1.6rem, 2.6vw, 2.2rem); margin-top: 0.45rem;
 }
 
 .note--demo strong { color: var(--ink); font-weight: 600; }
+
+/* Same page-level placement as the synthetic-data banner, in the alarm colour:
+   this one is not a remark about the data, it is a report that the backend is
+   not answering. */
+.note--offline {
+  margin: 0 0 var(--space-5);
+  color: var(--alarm);
+  background: rgba(255, 107, 87, 0.08);
+  border: 1px solid rgba(255, 107, 87, 0.28);
+  line-height: 1.6;
+}
+
+.note--offline strong { color: var(--ink); font-weight: 600; }
 
 .factlist { margin-top: 1.4rem; font-size: 0.9rem; }
 

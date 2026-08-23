@@ -78,7 +78,11 @@ export function useReveal(
         scale: 1,
         duration: 1,
         delay,
-        scrollTrigger: { trigger: element, start: "top 88%", once: true },
+        // "top bottom" and not a percentage band: anything with a pixel inside
+        // the viewport at load animates immediately. A band leaves content that
+        // is *almost* on screen sitting at opacity 0 until someone scrolls,
+        // which on the console means the dashboard's own grid can paint empty.
+        scrollTrigger: { trigger: element, start: "top bottom", once: true },
       });
     }, element);
 
@@ -99,7 +103,7 @@ export function useStagger(ref: RefObject<HTMLElement | null>, step = 0.07) {
         y: 22,
         duration: 0.85,
         stagger: step,
-        scrollTrigger: { trigger: element, start: "top 86%", once: true },
+        scrollTrigger: { trigger: element, start: "top bottom", once: true },
       });
     }, element);
 
