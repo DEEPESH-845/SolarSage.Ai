@@ -1,13 +1,32 @@
-# Nothing here is needed by the deployed API.
+# Shared by BOTH Vercel projects — Vercel reads this from the repository root
+# regardless of a project's Root Directory setting. So it may only list paths
+# that neither deployment needs.
+#
+#   solarsage-ai      root directory .     → the FastAPI API
+#   solarsage-console root directory web   → the Next.js console
+#
+# Do NOT add `web/` here. It looks like a saving for the API deployment and it
+# breaks the console's build outright: the directory is stripped before the build
+# starts, and `npm install` then fails with ENOENT on web/package.json.
+
+# Dependencies and build output — both deployments install and build their own.
+node_modules/
+**/node_modules/
+.next/
+web/.next/
+*.tsbuildinfo
+
+# Local environments and caches
 .venv/
 .git/
 .remember/
 __pycache__/
 **/__pycache__/
+
+# Documentation, fixtures and tooling neither deployment runs
 assets/
 tests/
 docs/
-web/
 requirements-dev.txt
 Hardware/MQTT/
 Hardware/MQTT_OFFLINE/
@@ -15,5 +34,7 @@ Hardware/Esp32_MQTT/
 Hardware/*.pdf
 Agents/solarsage_output/
 Agents/requirements.txt
+
+# Runtime data — the API regenerates this under DATA_DIR on boot
 Backend/data/solar_panel_system.db
 Backend/data/decisions/
