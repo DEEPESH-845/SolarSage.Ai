@@ -10,7 +10,7 @@ import { Meter } from "@/components/ui/Meter";
 import { Stagger } from "@/components/ui/Motion";
 import { Pill } from "@/components/ui/Pill";
 import { Panel } from "@/components/ui/Surface";
-import { getLogs, getOverview } from "@/lib/api";
+import { logsFeed, overviewFeed } from "@/lib/feed";
 import { reading, stamp } from "@/lib/format";
 import { healthLabel } from "@/lib/status";
 
@@ -24,7 +24,8 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Reports" };
 
 export default async function ReportsPage() {
-  const [overview, logs] = await Promise.all([getOverview(), getLogs()]);
+  const { data: overview, source, reason } = await overviewFeed();
+  const logs = await logsFeed(source);
   const { health, panels, counts, stats, settings } = overview;
 
   const errors = logs.filter((log) => log.level === "ERROR").length;
@@ -38,7 +39,9 @@ export default async function ReportsPage() {
     <ConsolePage
       eyebrow="Everything the system has recorded"
       title="Reports"
-      demo={Boolean(settings.demo_seeded_at)}
+      source={source}
+      reason={reason}
+      seeded={Boolean(settings.demo_seeded_at)}
       refreshInterval={settings.refresh_interval}
       actions={<ExportButtons stats={stats} counts={counts} panels={panels} logs={logs} />}
     >
