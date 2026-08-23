@@ -3,6 +3,10 @@
 # Test-only: starlette/fastapi TestClient needs httpx.
 httpx==0.28.1
 
+# tests/test_system.py runs either way — `python tests/test_system.py` needs
+# nothing extra — but this is what makes `pytest tests/` work as the README says.
+pytest==8.4.1
+
 # Browser checks for the frontend (screenshots, interaction runs).
 # After installing: python -m playwright install chromium
 playwright==1.62.0

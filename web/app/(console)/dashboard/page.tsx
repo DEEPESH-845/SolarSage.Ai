@@ -9,7 +9,7 @@ import { analyzeAllAction, sprayManyAction } from "@/app/actions";
 import { Empty } from "@/components/ui/Empty";
 import { Icon } from "@/components/ui/Icon";
 import { Stagger } from "@/components/ui/Motion";
-import { getOverview } from "@/lib/api";
+import { overviewFeed } from "@/lib/feed";
 import Link from "next/link";
 
 /**
@@ -22,13 +22,16 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Dashboard" };
 
 export default async function DashboardPage() {
-  const { health, panels, counts, stats, latest_decision, settings } = await getOverview();
+  const { data, source, reason } = await overviewFeed();
+  const { health, panels, counts, stats, latest_decision, settings } = data;
 
   return (
     <ConsolePage
       eyebrow="Array 01 · Bengaluru"
       title="Dashboard"
-      demo={Boolean(settings.demo_seeded_at)}
+      source={source}
+      reason={reason}
+      seeded={Boolean(settings.demo_seeded_at)}
       refreshInterval={settings.refresh_interval}
       actions={
         <>

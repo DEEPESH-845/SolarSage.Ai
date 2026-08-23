@@ -138,10 +138,11 @@ SolarSage employs 4 specialized AI agents that collaborate to optimize solar pan
 ## 🗂️ Project Structure
 
 ```
-├── api/index.py               # ASGI entrypoint for the deployed API (Vercel)
+├── main.py                    # ASGI entrypoint for the deployed API (Vercel)
 ├── run_system.py              # Local launcher: FastAPI :8000 + Next.js :3000
 ├── requirements.txt           # Python runtime dependencies
-├── vercel.json                # Serverless function config for the API
+├── vercel.json                # Python runtime config for the API
+├── .env.example               # Every backend variable, documented
 ├── Backend/
 │   ├── services.py            # Business logic — the single source of truth
 │   ├── demo.py                # Synthetic panel history for a database with no hardware behind it
@@ -155,7 +156,7 @@ SolarSage employs 4 specialized AI agents that collaborate to optimize solar pan
 │   ├── components/ui/         # Design-system primitives: Pill, Card, Meter, Icon, Toast, …
 │   ├── components/console/    # Dashboard, panels, reports and settings components
 │   ├── components/landing/    # Hero canvas, cost curve, loop, telemetry, ledger
-│   ├── lib/                   # Typed API client, formatters, status table, motion hooks
+│   ├── lib/                   # Typed API client, demo fallback + feed, formatters, motion hooks
 │   └── styles/                # The design system: core.css, console.css, landing.css
 ├── Agents/crew.py             # CV → forecast → decision → execution pipeline
 ├── Hardware/                  # ESP32 firmware, MQTT tooling, captured telemetry
@@ -168,9 +169,11 @@ HTTP layer over it, and the console renders what it returns without computing
 anything of its own.
 
 ```
-browser ──► Next.js (web/) ──server-side──► FastAPI (api/index.py) ──► Backend/services.py
-                                                                          │
-                                                 SQLite · image fixtures · Agents/crew.py
+browser ──► Next.js (web/) ──server-side──► FastAPI (main.py) ──► Backend/services.py
+                    │                                                    │
+                    │                            SQLite · image fixtures · Agents/crew.py
+                    │
+                    └── backend unreachable ──► web/lib/demo.ts (recorded run, labelled DEMO)
 ```
 
 The browser never calls the API directly: server components fetch during render
@@ -293,10 +296,61 @@ The console has two of its own, in `web/.env.local`:
 |---|---|---|
 | `API_URL` | `http://127.0.0.1:8000` | Where the API lives. Server-side only — it never reaches the browser |
 | `API_TOKEN` | unset | Must match the API's `API_TOKEN` when that is set |
+| `API_TIMEOUT_MS` | `6000` | How long a read waits before the console falls back to demo data |
+| `API_WRITE_TIMEOUT_MS` | `25000` | How long a write waits. Longer on purpose — a spray that timed out may still have opened the valve |
+
+Both files are documented in full: [`.env.example`](.env.example) for the API,
+[`web/.env.example`](web/.env.example) for the console. A test asserts that every
+setting the code reads appears in the template, so the two cannot drift.
 
 Runtime settings (dust thresholds, spray duration, water pressure, auto-clean,
 notifications, schedule, paused/active mode) live in the `system_settings`
 table and are editable from the UI.
+
+---
+
+## 🛟 When the backend is down
+
+The console is a separate deployment from the API, which means the API can be
+cold, redeploying, or simply gone while someone is looking at the page. None of
+those may produce an error screen, so the read path has one rule: **a backend
+that does not answer is a state to render, not an exception to throw.**
+
+```
+page (server component)
+   └─ overviewFeed()            web/lib/feed.ts
+        ├─ getOverview()  ──►  FastAPI            → { source: "live" }
+        └─ on failure     ──►  web/lib/demo.ts    → { source: "demo", reason }
+```
+
+Three states, and the screen always says which one it is in:
+
+| State | What happened | What the operator sees |
+|---|---|---|
+| **Live** | The API answered | `● LIVE DATA` in the rail, no banner |
+| **Live, seeded** | The API answered, but its database was filled by `Backend/demo.py` rather than by hardware | `● LIVE DATA`, plus the amber *Synthetic data* banner |
+| **Demo** | The API refused, timed out, or errored | `● DEMO DATA`, plus a red *Backend unavailable* banner naming the cause |
+
+Demo data is never presented as live. The distinction is carried explicitly in
+`source`, not inferred from the shape of the data, so no component downstream has
+to guess — and `demo_seeded_at` (a fact about the live database) stays separate
+from the fallback (a fact about reachability).
+
+**What the fallback is.** `web/lib/demo.ts` is a transcript of a real pipeline
+run against the panel image fixtures: the dust levels are what the classifier
+scored, the decision and its economics are what the decision engine returned,
+and the telemetry rows come from a recorded ESP32 capture in `Hardware/`. The
+tallies are counted off the panel list rather than typed beside it and the water
+spent is the wash count times the spray volume, so the numbers survive being
+added up. Tests in `web/lib/__tests__/feed.test.ts` assert exactly that.
+
+**Recovery is automatic.** A degraded page keeps its refresh timer running, so
+each tick re-attempts the fetch — a backend that was merely cold-starting brings
+the console back to live data with nobody reloading anything.
+
+**Writes are never faked.** Actions still call the API while degraded and report
+the real failure through a toast. Nothing reports success for a valve that did
+not open.
 
 ---
 
@@ -321,6 +375,14 @@ public sign-up. Within that, the parts that can act are guarded:
   is stored unvalidated.
 * `CORS_ORIGINS` decides who may call the API from a browser; it defaults to
   localhost, not to `*`.
+* No secret has ever been committed. The `.env` that appears in this repository's
+  history held paths, a LAN broker address and thresholds — no keys, no
+  passwords, nothing to rotate. `.gitignore` excludes `.env*` while keeping the
+  `.env.example` templates.
+* Errors are classified before they reach a screen (`ApiError.kind`:
+  `TIMEOUT`, `NETWORK_ERROR`, `AUTH_ERROR`, `VALIDATION_ERROR`, `NOT_FOUND`,
+  `SERVER_ERROR`). The operator gets a sentence; the cause goes to the server
+  log. A backend stack trace is never rendered.
 
 ---
 
@@ -341,9 +403,18 @@ operations, and every FastAPI route including the token guard. It runs against a
 temporary database and never touches the real one.
 
 The console's tests cover what the console itself decides: formatting a reading
-that might be null, and the one table that maps a panel state to its label,
-colour and next step. Everything else it renders is a rule that lives in Python,
-where it already has tests.
+that might be null, the table that maps a panel state to its label, colour and
+next step, and the fallback path — that an unreachable backend yields a populated
+console marked `demo` rather than an error, that failures are classified into the
+kinds the UI branches on, and that the demo dataset's own arithmetic holds (its
+tallies sum to the panel count, its water spent equals wash count times spray
+volume, and nothing in it is non-finite). Everything else it renders is a rule
+that lives in Python, where it already has tests.
+
+Two of the Python tests exist only to protect the deployment: one asserts the
+root `main.py` entrypoint serves every route, the other that `vercel.json` names
+a file that exists and carries no path-replacing rewrite. Both encode the bug
+that made the deployed API 404 on everything.
 
 ---
 
@@ -372,51 +443,102 @@ where it already has tests.
 
 ## ☁️ Deployment (Vercel)
 
-Live: **https://solarsage-ai.vercel.app**
+| | URL |
+|---|---|
+| **Console** (start here) | **https://solarsage-console.vercel.app** |
+| API | https://solarsage-ai.vercel.app |
+| API docs | https://solarsage-ai.vercel.app/docs |
 
-Two projects from this one repository, because they are two runtimes:
+Two Vercel projects from this one repository, because they are two runtimes.
+Both deploy from `main`, and either can be redeployed without the other.
 
-| Project | Root directory | Serves |
-|---|---|---|
-| `solarsage-api` | `.` | `api/index.py` → FastAPI, on the Python runtime |
-| `solarsage-web` | `web` | The Next.js console |
+| Project | Root directory | Framework | Serves |
+|---|---|---|---|
+| `solarsage-ai` | `.` | FastAPI (Python) | `main.py` → the whole ASGI app |
+| `solarsage-console` | `web` | Next.js | The landing page and the console |
+
+**Why this split.** The console is a Next.js app and belongs on a platform that
+runs the App Router natively; the API is an ASGI app that Vercel's Python runtime
+serves as-is, with no rewrite rules and no container to maintain. Both fit the
+free Hobby tier, both get HTTPS and a git-push deploy, and neither needs a
+credential from a third party. Keeping them separate means a backend redeploy
+cannot take the demo down: the console degrades and keeps serving (see
+[When the backend is down](#-when-the-backend-is-down)).
+
+Both projects run in `bom1`, so the console's server-side call to the API stays
+in one region instead of crossing an ocean on every render.
+
+### The entrypoint matters
+
+`main.py` sits at the repository root, not under `api/`. A module under `api/` is
+treated as one function bound to its own path, so a catch-all rewrite is needed
+to reach it — and that rewrite **replaces the request path**, which means FastAPI
+receives `/api/index` instead of `/health` and every route 404s. A root-level
+`main.py` is served for every path with no rewrite at all.
+`tests/test_system.py` asserts both halves of this so it cannot regress.
+
+### Deploying from scratch
 
 ```bash
 npm i -g vercel
 
-# 1. the API
-vercel link                                      # root directory: .
-vercel env add API_TOKEN production              # python -c "import secrets;print(secrets.token_hex(32))"
+# 1. the API  (repository root)
+vercel link                                    # root directory: .
+vercel env add API_TOKEN production            # python -c "import secrets;print(secrets.token_urlsafe(32))"
 vercel --prod
 
 # 2. the console
 cd web
-vercel link                                      # root directory: web
-vercel env add API_URL production                # https://<the API deployment>
-vercel env add API_TOKEN production              # the same secret
+vercel link                                    # root directory: web
+vercel env add API_URL production              # https://<the API deployment>
+vercel env add API_TOKEN production            # the SAME secret as above
 vercel --prod
 ```
 
-`DATA_DIR` defaults to `/tmp/solarsage` automatically when the `VERCEL`
-environment variable is present, because serverless filesystems are read-only
-apart from `/tmp`.
+`API_TOKEN` must match on both sides. Set it: with it unset the API accepts
+anonymous writes, and anyone who can reach the URL can open a valve.
 
-**Storage caveat:** `/tmp` is per-instance and cleared when an instance
-recycles, so the deployed database is ephemeral — fine for a demo, but point
-`SQLITE_DATABASE_PATH` at persistent storage (or move to Postgres) for real
-deployments. Panel images and hardware captures ship with the bundle and are
-read-only, so they always work.
+`DATA_DIR` needs no configuration — it defaults to `/tmp/solarsage` whenever the
+`VERCEL` environment variable is present, because serverless filesystems are
+read-only apart from `/tmp`.
 
-**Synthetic data when there is no hardware:** because that database starts
-empty on every cold start, `Backend/demo.py` seeds it with a week of operation
-the first time it comes up — it runs the real classifier over the four image
-fixtures, then back-fills the wash and the readings taken since it for each
-panel. Nothing is fabricated: the dust levels, forecasts and economics are what
-the pipeline reports for those frames. Seeded databases record a
-`demo_seeded_at` setting, and every console page carries a banner saying so.
-Set `DEMO_DATA=false` to disable it; the seed is a no-op once any real analysis
-exists.
+**Storage caveat.** `/tmp` is per-instance and cleared when an instance recycles,
+so the deployed database is ephemeral: a settings change or a wash you trigger
+survives until that instance is replaced, not indefinitely. That is a deliberate
+trade — it keeps the project free and dependency-free — and it is honest on
+screen, because a fresh instance re-seeds and labels itself synthetic. Point
+`SQLITE_DATABASE_PATH` at persistent storage, or move to Postgres, for a real
+deployment.
 
+**Synthetic data when there is no hardware.** Because that database starts empty
+on every cold start, `Backend/demo.py` seeds it the first time it comes up — it
+runs the real classifier over the four image fixtures, then back-fills the wash
+and the readings taken since for each panel. Nothing is fabricated: the dust
+levels, forecasts and economics are what the pipeline reports for those frames.
+Seeded databases record a `demo_seeded_at` setting and every console page carries
+a banner saying so. `DEMO_DATA=false` disables it; the seed is a no-op once any
+real analysis exists.
+
+---
+
+## 🧭 Known limitations
+
+* **Ephemeral storage on the free tier.** As above: writes live in `/tmp` and do
+  not survive an instance recycle. Fine for a demo, not for an installation.
+* **`/docs` and `/openapi.json` are public.** Deliberate — the API is a portfolio
+  artefact and the schema is worth reading. Close them for a real deployment.
+* **Process uptime, not system uptime.** The dashboard's uptime figure is how
+  long the current process has run, which on serverless is near zero. It is
+  labelled *Process uptime* rather than dressed up as something else.
+* **No user accounts.** Access is one shared `API_TOKEN` for writes; reads are
+  open. Enough for a single-operator console, not a multi-tenant product.
+* **Hardware telemetry is replayed, not streamed.** The ESP32 captures in
+  `Hardware/` are read from disk. Live MQTT ingestion is wired in the firmware
+  but not in the deployed API.
+* **CV is classical, not learned.** Dust scoring is OpenCV texture/contrast
+  analysis, which is deterministic and fast but not a trained model.
+
+---
 
 ## 📎 License
 This project was developed for the Qualcomm Edge AI Developer Hackathon 2025. For academic or non-commercial use only. Contact maintainers for other licensing.
